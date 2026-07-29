@@ -1,5 +1,9 @@
-"""Atlas layouts, animation config, and event mapping."""
+"""Atlas layouts and animation config (pure rendering data).
 
+Event → behavior mapping lives in state.py.
+"""
+
+from dataclasses import dataclass
 from enum import StrEnum
 from importlib.resources import files
 
@@ -15,32 +19,40 @@ class Anim(StrEnum):
     CELEBRATE = 'celebrate'
     ANNOYED = 'annoyed'
 
-# Known atlases: short name -> (filename, cols, rows, border_filename).
-# border_filename is None when no border asset exists for that atlas.
-ATLAS_LAYOUTS: dict[str, tuple[str, int, int, str | None]] = {
-    "peon":        ("peon-atlas.png",               6, 6, None),
-    "orc":         ("orc-sprite-atlas.png",         6, 6, "orc-borders.png"),
-    "capybara":    ("capybara-sprite-atlas.png",    6, 6, "capybara-borders.png"),
-    "hello-kitty": ("hello-kitty-sprite-atlas.png", 6, 6, "hello-kitty-borders.png"),
-    "laptop-guy":  ("laptop-guy-atlas.png",          6, 4, None),
+
+@dataclass(frozen=True, slots=True)
+class AtlasLayout:
+    """Sprite atlas grid layout + optional border overlay filename."""
+    filename: str
+    cols: int
+    rows: int
+    border: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class AnimConfig:
+    """Atlas row layout for one animation."""
+    row: int
+    frames: int
+    fps: int
+    loop: bool
+
+
+# Known atlases: short name -> layout. border defaults to None when absent.
+ATLAS_LAYOUTS: dict[str, AtlasLayout] = {
+    "peon":        AtlasLayout("peon-atlas.png",               6, 6),
+    "orc":         AtlasLayout("orc-sprite-atlas.png",         6, 6, "orc-borders.png"),
+    "capybara":    AtlasLayout("capybara-sprite-atlas.png",    6, 6, "capybara-borders.png"),
+    "hello-kitty": AtlasLayout("hello-kitty-sprite-atlas.png", 6, 6, "hello-kitty-borders.png"),
+    "laptop-guy":  AtlasLayout("laptop-guy-atlas.png",          6, 4),
 }
 
-# Atlas row layout: anim -> (row, frames, fps, loop)
-ANIM_CONFIG: dict[Anim, tuple[int, int, int, bool]] = {
-    Anim.SLEEPING:  (0, 6, 3, True),
-    Anim.WAKING:    (1, 6, 8, False),
-    Anim.TYPING:    (2, 6, 8, False),
-    Anim.ALARMED:   (3, 6, 8, False),
-    Anim.CELEBRATE: (4, 6, 8, False),
-    Anim.ANNOYED:   (5, 6, 8, False),
-}
-
-# OG peon-ping/Claude hook event names -> animation
-EVENT_TO_ANIM: dict[str, Anim] = {
-    'SessionStart':       Anim.WAKING,
-    'UserPromptSubmit':   Anim.TYPING,
-    'PermissionRequest':  Anim.ALARMED,
-    'PreCompact':         Anim.ALARMED,
-    'Stop':               Anim.CELEBRATE,
-    'PostToolUseFailure': Anim.ANNOYED,
+# Atlas row layout: anim -> config.
+ANIM_CONFIG: dict[Anim, AnimConfig] = {
+    Anim.SLEEPING:  AnimConfig(0, 6, 3, True),
+    Anim.WAKING:    AnimConfig(1, 6, 8, False),
+    Anim.TYPING:    AnimConfig(2, 6, 8, True),
+    Anim.ALARMED:   AnimConfig(3, 6, 8, False),
+    Anim.CELEBRATE: AnimConfig(4, 6, 8, False),
+    Anim.ANNOYED:   AnimConfig(5, 6, 8, False),
 }

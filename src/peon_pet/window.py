@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-from typing import override
+from typing import final, override
 
 from PyQt6 import QtCore, QtGui, QtWidgets
 
@@ -51,21 +51,26 @@ def _save_pos(pos: QtCore.QPoint) -> None:
     p.write_text(json.dumps(data, indent=2))
 
 
+@final
 class PetWindow(QtWidgets.QWidget):
     # Class-level type declarations (assigned in __init__).
     atlas: QtGui.QPixmap
     border: QtGui.QPixmap | None
     cell_w: float
     cell_h: float
-    reaction_loops: int
+    loops: int
     anim: Anim
     row: int
     max_frames: int
     loop: bool
-    remaining_loops: int
     frame: int
+    _loops_played: int
     timer: QtCore.QTimer
     _drag_offset: QtCore.QPoint | None
+
+    # Emitted when a one-shot anim has played `loops` times. The state machine
+    # reacts to this by switching to the base anim.
+    finished = QtCore.pyqtSignal()
 
     def __init__(
             self,
@@ -83,21 +88,23 @@ class PetWindow(QtWidgets.QWidget):
         self.setFixedSize(WIN_SIZE, WIN_SIZE)
 
         # Load atlas + border assets from the configured layout.
-        filename, cols, rows, border_file = ATLAS_LAYOUTS[atlas]
-        self.atlas = QtGui.QPixmap(str(ASSETS / filename))
+        layout = ATLAS_LAYOUTS[atlas]
+        self.atlas = QtGui.QPixmap(str(ASSETS / layout.filename))
         if self.atlas.isNull():
-            raise RuntimeError(f"failed to load atlas: {filename}")
-        if border_file is not None:
-            self.border = QtGui.QPixmap(str(ASSETS / border_file))
-            if self.border.isNull():
-                raise RuntimeError(f"failed to load border: {border_file}")
+            raise RuntimeError(f"failed to load atlas: {layout.filename}")
+        if layout.border is not None:
+            border = QtGui.QPixmap(str(ASSETS / layout.border))
+            if border.isNull():
+                raise RuntimeError(f"failed to load border: {layout.border}")
+            self.border = border
         else:
             self.border = None
-        self.cell_w = self.atlas.width() / cols
-        self.cell_h = self.atlas.height() / rows
-        self.reaction_loops = loops
+        self.cell_w = self.atlas.width() / layout.cols
+        self.cell_h = self.atlas.height() / layout.rows
+        self.loops = loops
 
         self.frame = 0
+        self._loops_played = 0
         self._drag_offset = None
         self.timer = QtCore.QTimer(self)
         _ = self.timer.timeout.connect(self.advance)
@@ -115,11 +122,17 @@ class PetWindow(QtWidgets.QWidget):
                 self.move(geo.x() + 20, geo.bottom() - WIN_SIZE - 20)
 
     def play(self, anim: Anim) -> None:
-        """Start playing `anim`. Event anims play `reaction_loops` times then return to sleeping."""
+        """Switch to `anim` and render it.
+
+        Looping anims (sleeping, typing) loop forever. One-shot anims
+        (waking, alarmed, …) play `loops` times, then emit `finished` — the
+        caller (state machine) decides what follows. Never self-switches.
+        """
         self.anim = anim
-        self.row, self.max_frames, fps, self.loop = ANIM_CONFIG[anim]
-        self.remaining_loops = 0 if anim == Anim.SLEEPING else self.reaction_loops - 1
+        cfg = ANIM_CONFIG[anim]
+        self.row, self.max_frames, fps, self.loop = cfg.row, cfg.frames, cfg.fps, cfg.loop
         self.frame = 0
+        self._loops_played = 0
         self.timer.setInterval(int(1000 / fps))
         if not self.timer.isActive():
             self.timer.start()
@@ -130,14 +143,16 @@ class PetWindow(QtWidgets.QWidget):
             if self.loop:
                 self.frame = 0
             else:
-                if self.remaining_loops > 0:
-                    self.remaining_loops -= 1
-                    self.frame = 0
-                else:
-                    # Event finished — return to idle
-                    self.play(Anim.SLEEPING)
+                self._loops_played += 1
+                if self._loops_played >= self.loops:
+                    # Reaction played out — hold the last frame as a fallback.
+                    # In practice the synchronous finished → state → play(base)
+                    # chain switches at this loop boundary without a freeze.
+                    self.frame = self.max_frames - 1
+                    self.finished.emit()
                     self.update()
                     return
+                self.frame = 0
         self.update()
 
     @override

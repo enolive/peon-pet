@@ -12,7 +12,8 @@ from pathlib import Path
 
 from PyQt6 import QtCore, QtWidgets
 
-from .config import ATLAS_LAYOUTS, ANIM_CONFIG, EVENT_TO_ANIM, Anim
+from .config import ATLAS_LAYOUTS, ANIM_CONFIG, Anim, AtlasLayout
+from .state import EVENT_REACTION, KNOWN_EVENTS, PetStateMachine
 from .watcher import DEFAULT_STATE_PATH, StateWatcher
 from .window import PetWindow
 
@@ -24,35 +25,40 @@ def _resolve_atlas(arg: str) -> None:
     print(f"atlas not found: {arg!r}", file=sys.stderr)
     print("available atlases (--atlas <name>):", file=sys.stderr)
     sorted_layouts = sorted(ATLAS_LAYOUTS.items())
-    layout: tuple[str, tuple[str, int, int, str | None]]
+    layout: tuple[str, AtlasLayout]
     for layout in sorted_layouts:
-        name, (_, cols, rows, _) = layout
-        print(f"  {name:14s} {cols}x{rows}", file=sys.stderr)
+        name, atlas_layout = layout
+        print(f"  {name:14s} {atlas_layout.cols}x{atlas_layout.rows}", file=sys.stderr)
     sys.exit(1)
 
 
-def _resolve_event(arg: str, atlas_rows: int) -> Anim:
-    """Resolve an event name to an anim, or list available and exit."""
+def _resolve_event(arg: str, atlas_rows: int) -> str:
+    """Validate an event name, or list available events and exit. Returns the name."""
     if arg == 'idle':
-        anim = Anim.SLEEPING
-    elif arg in EVENT_TO_ANIM:
-        anim = EVENT_TO_ANIM[arg]
-    else:
+        return arg
+    if arg not in KNOWN_EVENTS:
         print(f"event not found: {arg!r}", file=sys.stderr)
         print("available events (--event <name>):", file=sys.stderr)
         print(f"  {'idle':22s} sleeping  (row 0)", file=sys.stderr)
         name: str
-        for name in sorted(EVENT_TO_ANIM):
-            anim_name = EVENT_TO_ANIM[name]
-            row = ANIM_CONFIG[anim_name][0]
-            avail = "ok" if row < atlas_rows else "(not in this atlas)"
-            print(f"  {name:22s} {anim_name:9s} (row {row}) {avail}", file=sys.stderr)
+        for name in sorted(KNOWN_EVENTS):
+            anim = EVENT_REACTION.get(name)
+            if anim is None:
+                # SessionEnd — settles to sleeping, no transient reaction.
+                print(f"  {name:22s} (→idle)   (row 0)", file=sys.stderr)
+            else:
+                row = ANIM_CONFIG[anim].row
+                avail = "ok" if row < atlas_rows else "(not in this atlas)"
+                print(f"  {name:22s} {anim:9s} (row {row}) {avail}", file=sys.stderr)
         sys.exit(1)
-    row = ANIM_CONFIG[anim][0]
-    if row >= atlas_rows:
-        print(f"event {arg!r} → {anim} (row {row}) is not in this atlas ({atlas_rows} rows)", file=sys.stderr)
-        sys.exit(1)
-    return anim
+    # Row-availability check for the reaction anim (if any).
+    anim = EVENT_REACTION.get(arg)
+    if anim is not None:
+        row = ANIM_CONFIG[anim].row
+        if row >= atlas_rows:
+            print(f"event {arg!r} → {anim} (row {row}) is not in this atlas ({atlas_rows} rows)", file=sys.stderr)
+            sys.exit(1)
+    return arg
 
 
 @dataclass
@@ -72,9 +78,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument("--atlas", default="peon",
                         help="atlas short name (default: peon)")
     parser.add_argument("--event", default="idle",
-                        help="event to play on startup, then return to idle (default: idle)")
+                        help="event to react to on startup (default: idle)")
     parser.add_argument("--loops", type=int, default=3,
-                        help="times to play an event anim before idle (default: 3)")
+                        help="times to loop a reaction anim before returning to base (default: 3)")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--demo", action="store_true",
                       help="cycle through every animation every 3s (visual QA)")
@@ -87,14 +93,14 @@ def main(argv: Sequence[str] | None = None) -> None:
                    watch=Path(ns.watch) if ns.watch is not None else None)
 
     _resolve_atlas(args.atlas)
-    _, _, rows, _ = ATLAS_LAYOUTS[args.atlas]
-    start_anim = _resolve_event(args.event, rows)
+    rows = ATLAS_LAYOUTS[args.atlas].rows
+    _resolve_event(args.event, rows)
 
     app = QtWidgets.QApplication(sys.argv)
     app.setApplicationName("Peon Pet")
 
     try:
-        win = PetWindow(args.atlas, args.loops, start_anim)
+        win = PetWindow(args.atlas, args.loops)
     except RuntimeError as e:
         print(f"ERROR: {e}", file=sys.stderr)
         sys.exit(1)
@@ -122,10 +128,16 @@ def main(argv: Sequence[str] | None = None) -> None:
         demo_timer = QtCore.QTimer()
         demo_timer.start(3000)
         _ = demo_timer.timeout.connect(_cycle)
-    elif args.watch is not None:
-        watcher = StateWatcher(args.watch)
-        watcher.event_triggered.connect(win.play)
-        watcher.start()
+    else:
+        state = PetStateMachine()
+        state.anim_changed.connect(win.play)
+        win.finished.connect(state.on_finished)
+        if args.event != 'idle':
+            state.handle_event(args.event)
+        if args.watch is not None:
+            watcher = StateWatcher(args.watch)
+            watcher.event_triggered.connect(state.handle_event)
+            watcher.start()
 
     sys.exit(app.exec())
 
