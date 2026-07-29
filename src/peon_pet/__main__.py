@@ -7,6 +7,7 @@ import signal
 import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
+from itertools import cycle
 
 from PyQt6 import QtCore, QtWidgets
 
@@ -57,6 +58,7 @@ class CliArgs:
     atlas: str
     event: str
     loops: int
+    demo: bool
 
 
 def main(argv: Sequence[str] | None = None) -> None:
@@ -70,8 +72,11 @@ def main(argv: Sequence[str] | None = None) -> None:
                         help="event to play on startup, then return to idle (default: idle)")
     parser.add_argument("--loops", type=int, default=3,
                         help="times to play an event anim before idle (default: 3)")
+    parser.add_argument("--demo", action="store_true",
+                        help="cycle through every animation every 3s (visual QA)")
     ns = parser.parse_args(argv)
-    args = CliArgs(atlas=str(ns.atlas), event=str(ns.event), loops=int(ns.loops))
+    args = CliArgs(atlas=str(ns.atlas), event=str(ns.event), loops=int(ns.loops),
+                   demo=bool(ns.demo))
 
     _resolve_atlas(args.atlas)
     _, _, rows, _ = ATLAS_LAYOUTS[args.atlas]
@@ -97,6 +102,18 @@ def main(argv: Sequence[str] | None = None) -> None:
         pass
 
     _ = timer.timeout.connect(_no_op)
+
+    if args.demo:
+        # Cycle through every animation every 3s to exercise play() at runtime.
+        it = iter(cycle(Anim))
+        next(it)  # skip the one already playing as start_anim
+
+        def _cycle() -> None:
+            win.play(next(it))
+
+        demo_timer = QtCore.QTimer()
+        demo_timer.start(3000)
+        _ = demo_timer.timeout.connect(_cycle)
 
     sys.exit(app.exec())
 
