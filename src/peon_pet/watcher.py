@@ -1,47 +1,54 @@
-"""Polls peon-ping's .state.json and emits (event, session_id) signals."""
+"""Polls peon-ping's .state.json and invokes a callback for new events."""
 
 from __future__ import annotations
 
 import json
+import threading
+from collections.abc import Callable
 from pathlib import Path
 from typing import final
 
-from PyQt6 import QtCore
-
 DEFAULT_STATE_PATH = Path.home() / ".claude" / "hooks" / "peon-ping" / ".state.json"
-POLL_INTERVAL_MS = 500
+POLL_INTERVAL_S = 0.5
+
+# Callback shape: (event_name, session_id).
+OnEvent = Callable[[str, str], None]
 
 
 @final
-class StateWatcher(QtCore.QObject):
-    """Polls peon-ping's state file (mtime-based) and emits event_triggered(str, str).
+class StateWatcher:
+    """Polls peon-ping's state file (mtime-based) and calls on_event(event, session_id).
 
-    Emits (raw event name, session id); the state machine decides what to do
-    with them. The session id lets the state machine track multiple concurrent
-    sessions without one session's Stop zeroing the liveness flag for the others.
+    Polling runs in a daemon thread. Because the callback fires on that thread,
+    callers crossing into a GUI thread must marshal themselves — typically via
+    a Qt signal at the seam (see __main__).
 
     peon-ping writes .state.json atomically (tempfile + os.replace), which breaks
     QFileSystemWatcher's inode-based watch — so we poll mtime instead.
     """
 
-    event_triggered = QtCore.pyqtSignal(str, str)
-
-    def __init__(self, path: Path = DEFAULT_STATE_PATH, parent: QtCore.QObject | None = None) -> None:
-        super().__init__(parent)
+    def __init__(self, path: Path = DEFAULT_STATE_PATH, on_event: OnEvent | None = None) -> None:
         self.path = path
+        self.on_event: OnEvent = on_event if on_event is not None else _noop
         self._last_mtime: float = 0.0
         self._last_timestamp: float = 0.0
-        self._timer = QtCore.QTimer(self)
-        _ = self._timer.timeout.connect(self._poll)
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
 
     def start(self) -> None:
-        """Begin polling. Emits the current event (if any) so the state machine
-        syncs to current reality, then polls for changes."""
-        self._emit_current()
-        self._timer.start(POLL_INTERVAL_MS)
+        """Begin polling in a daemon thread. Emits the current event first so
+        consumers sync to current reality, then polls for changes."""
+        self._stop.clear()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
 
     def stop(self) -> None:
-        self._timer.stop()
+        self._stop.set()
+
+    def _run(self) -> None:
+        self._emit_current()
+        while not self._stop.wait(POLL_INTERVAL_S):
+            self._poll()
 
     def _emit_current(self) -> None:
         """Emit the current event and record its timestamp so the next poll
@@ -50,13 +57,12 @@ class StateWatcher(QtCore.QObject):
         last_active = self._read_last_active()
         if last_active is None:
             return
-        ts = self._ts(last_active)
-        self._last_timestamp = ts
+        self._last_timestamp = self._ts(last_active)
         ev = _field(last_active, "event")
         sid = _field(last_active, "session_id")
         if ev is None or sid is None:
             return
-        self.event_triggered.emit(ev, sid)
+        self.on_event(ev, sid)
 
     def _poll(self) -> None:
         mtime = self._mtime()
@@ -74,7 +80,7 @@ class StateWatcher(QtCore.QObject):
         sid = _field(last_active, "session_id")
         if ev is None or sid is None:
             return
-        self.event_triggered.emit(ev, sid)
+        self.on_event(ev, sid)
 
     @staticmethod
     def _ts(last_active: dict[str, object]) -> float:
@@ -103,3 +109,7 @@ class StateWatcher(QtCore.QObject):
 def _field(last_active: dict[str, object], key: str) -> str | None:
     v = last_active.get(key)
     return v if isinstance(v, str) else None
+
+
+def _noop(_event: str, _session_id: str) -> None:
+    pass

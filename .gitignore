@@ -14,7 +14,4 @@ __pycache__/
 # Legacy Electron project (kept for reference, not built)
 legacy/
 
-# Scratch planning docs (AI-generated session artifacts)
-docs/plans/
-
 *.DS_Store

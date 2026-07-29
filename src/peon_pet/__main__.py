@@ -10,12 +10,27 @@ from dataclasses import dataclass
 from itertools import cycle
 from pathlib import Path
 
+from typing import final
+
 from PyQt6 import QtCore, QtWidgets
 
 from .config import ATLAS_LAYOUTS, ANIM_CONFIG, Anim, AtlasLayout
 from .state import EVENT_REACTION, KNOWN_EVENTS, PetStateMachine
 from .watcher import DEFAULT_STATE_PATH, StateWatcher
 from .window import PetWindow
+
+
+@final
+class _Seam(QtCore.QObject):
+    """Marshals state-machine anim changes onto the GUI thread.
+
+    The state machine runs on the watcher's daemon thread (and is also touched
+    from the GUI thread via window.finished). Its only GUI-thread requirement is
+    that `win.play` runs on the GUI thread — so the seam sits at the state→window
+    boundary, not at watcher→state. Created on the GUI thread.
+    """
+
+    anim_changed = QtCore.pyqtSignal(Anim)
 
 
 def _resolve_atlas(arg: str) -> None:
@@ -130,13 +145,20 @@ def main(argv: Sequence[str] | None = None) -> None:
         _ = demo_timer.timeout.connect(_cycle)
     else:
         state = PetStateMachine()
-        state.anim_changed.connect(win.play)
+        seam = _Seam()
+        # state → window: cross-thread (state runs on the watcher's daemon
+        # thread), so route through the seam to marshal onto the GUI thread.
+        state.on_anim_changed = seam.anim_changed.emit
+        seam.anim_changed.connect(win.play)
+        # window → state: window.finished fires on the GUI thread; state is
+        # thread-safe (locked), so a direct connection is fine.
         win.finished.connect(state.on_finished)
         if args.event != 'idle':
             state.handle_event(args.event, 'cli')
         if args.watch is not None:
             watcher = StateWatcher(args.watch)
-            watcher.event_triggered.connect(state.handle_event)
+            # watcher daemon thread → state (pure Python, direct; no marshal).
+            watcher.on_event = state.handle_event
             watcher.start()
 
     sys.exit(app.exec())
