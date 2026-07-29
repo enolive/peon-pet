@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+import os
+from pathlib import Path
 from typing import override
 
 from PyQt6 import QtCore, QtGui, QtWidgets
@@ -10,6 +13,42 @@ from .config import ANIM_CONFIG, ASSETS, ATLAS_LAYOUTS, Anim
 
 WIN_SIZE: int = 200
 SPRITE_SIZE: int = 180  # inset like the JS (PlaneGeometry 180 in a 200 win)
+
+
+def _config_path() -> Path:
+    """XDG config path for user prefs (window position, etc.)."""
+    xdg = os.environ.get("XDG_CONFIG_HOME")
+    base = Path(xdg) if xdg else Path.home() / ".config"
+    return base / "peon-pet" / "config.json"
+
+
+def _load_pos() -> QtCore.QPoint | None:
+    """Read saved window position, or None if absent/invalid."""
+    try:
+        data = json.loads(_config_path().read_text())
+    except (OSError, ValueError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    w = data.get("window")
+    if not isinstance(w, dict):
+        return None
+    x, y = w.get("x"), w.get("y")
+    if isinstance(x, int) and isinstance(y, int):
+        return QtCore.QPoint(x, y)
+    return None
+
+
+def _save_pos(pos: QtCore.QPoint) -> None:
+    """Persist window position into the config file (merging existing keys)."""
+    p = _config_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        data = json.loads(p.read_text())
+    except (OSError, ValueError):
+        data = {}
+    data["window"] = {"x": pos.x(), "y": pos.y()}
+    p.write_text(json.dumps(data, indent=2))
 
 
 class PetWindow(QtWidgets.QWidget):
@@ -26,6 +65,7 @@ class PetWindow(QtWidgets.QWidget):
     remaining_loops: int
     frame: int
     timer: QtCore.QTimer
+    _drag_offset: QtCore.QPoint | None
 
     def __init__(
             self,
@@ -58,16 +98,21 @@ class PetWindow(QtWidgets.QWidget):
         self.reaction_loops = loops
 
         self.frame = 0
+        self._drag_offset = None
         self.timer = QtCore.QTimer(self)
         _ = self.timer.timeout.connect(self.advance)
         # Play the initial event (or idle) once at startup.
         self.play(start_anim)
 
-        # Bottom-left corner of the work area
-        screen = QtWidgets.QApplication.primaryScreen()
-        if screen is not None:
-            geo = screen.availableGeometry()
-            self.move(geo.x() + 20, geo.bottom() - WIN_SIZE - 20)
+        # Position: saved overrides the default bottom-left corner.
+        saved = _load_pos()
+        if saved is not None and QtWidgets.QApplication.screenAt(saved) is not None:
+            self.move(saved)
+        else:
+            screen = QtWidgets.QApplication.primaryScreen()
+            if screen is not None:
+                geo = screen.availableGeometry()
+                self.move(geo.x() + 20, geo.bottom() - WIN_SIZE - 20)
 
     def play(self, anim: Anim) -> None:
         """Start playing `anim`. Event anims play `reaction_loops` times then return to sleeping."""
@@ -94,6 +139,27 @@ class PetWindow(QtWidgets.QWidget):
                     self.update()
                     return
         self.update()
+
+    @override
+    def mousePressEvent(self, a0: QtGui.QMouseEvent | None) -> None:
+        if a0 is not None and a0.button() == QtCore.Qt.MouseButton.LeftButton:
+            self._drag_offset = a0.globalPosition().toPoint() - self.frameGeometry().topLeft()
+            a0.accept()
+
+    @override
+    def mouseMoveEvent(self, a0: QtGui.QMouseEvent | None) -> None:
+        if (a0 is not None and self._drag_offset is not None
+                and a0.buttons() & QtCore.Qt.MouseButton.LeftButton):
+            self.move(a0.globalPosition().toPoint() - self._drag_offset)
+            a0.accept()
+
+    @override
+    def mouseReleaseEvent(self, a0: QtGui.QMouseEvent | None) -> None:
+        if (a0 is not None and a0.button() == QtCore.Qt.MouseButton.LeftButton
+                and self._drag_offset is not None):
+            self._drag_offset = None
+            _save_pos(self.pos())
+            a0.accept()
 
     @override
     def paintEvent(self, a0: QtGui.QPaintEvent | None) -> None:
