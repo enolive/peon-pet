@@ -8,16 +8,20 @@ emits the current base anim.
 Session model
 -------------
 - IDLE:    no session active — base anim is SLEEPING.
-- WORKING: a session is running — base anim is TYPING.
+- WORKING: at least one session is active — base anim is TYPING.
 
-SessionStart / working events (tool use, prompt submit) mark the session
-active; SessionEnd marks it idle. Stop is *not* a session end — it's just a
-task-complete reaction, so the pet returns to typing (not sleeping) afterwards.
+SessionStart / working events (tool use, prompt submit) add the session to
+the active set; Stop / SessionEnd remove *that session only*. Each session's
+last-seen timestamp is recorded, so a future staleness sweep can reap
+sessions whose end event was lost. Multiple concurrent agents are tracked
+correctly: one session finishing does not zero the liveness flag for the
+others.
 """
 
 from __future__ import annotations
 
 import sys
+import time
 from typing import final
 
 from PyQt6 import QtCore
@@ -54,11 +58,35 @@ EVENT_REACTION: dict[str, Anim] = {
 KNOWN_EVENTS: frozenset[str] = frozenset(EVENT_REACTION) | _SESSION_END_EVENTS
 
 
+class _SessionRegistry:
+    """Active sessions keyed by id, with last-seen timestamps.
+
+    Timestamps are local `time.time()` readings taken when a session touches
+    the registry. They enable a future staleness sweep to reap sessions whose
+    end event was lost. No cleanup runs yet — the registry grows until a
+    Stop/SessionEnd lands, so `reconcile` is the seam a future timer would call.
+    """
+
+    def __init__(self) -> None:
+        self.sessions: dict[str, float] = {}
+
+    def add(self, session_id: str) -> None:
+        self.sessions[session_id] = time.time()
+
+    def discard(self, session_id: str) -> None:
+        self.sessions.pop(session_id, None)
+
+    @property
+    def active(self) -> bool:
+        return bool(self.sessions)
+
+
 @final
 class PetStateMachine(QtCore.QObject):
-    """Owns session liveness and emits anim transitions for the window.
+    """Owns the set of active sessions and emits anim transitions for the window.
 
-    - Base anim is SLEEPING when idle, TYPING when a session is active.
+    - Base anim is SLEEPING when the active-session set is empty, TYPING when
+      at least one session is active.
     - A transient reaction is emitted on its event; the window plays it
       `loops` times, then emits `finished`, which routes back here to settle on
       the base anim.
@@ -70,23 +98,24 @@ class PetStateMachine(QtCore.QObject):
 
     def __init__(self, parent: QtCore.QObject | None = None) -> None:
         super().__init__(parent)
-        self.session_active: bool = False
+        self._sessions = _SessionRegistry()
 
     @property
     def base_anim(self) -> Anim:
-        return Anim.TYPING if self.session_active else Anim.SLEEPING
+        return Anim.TYPING if self._sessions.active else Anim.SLEEPING
 
-    def handle_event(self, event: str) -> None:
+    def handle_event(self, event: str, session_id: str) -> None:
         """Process a peon-ping event, emitting the appropriate anim."""
         if event not in KNOWN_EVENTS:
             print(f"peon-pet: unknown peon-ping event {event!r}", file=sys.stderr)
             return
 
-        # Update session mode first — it determines the base anim reactions return to.
+        # Update the active-session registry first — it determines the base
+        # anim reactions return to. End events remove only the emitting session.
         if event in _SESSION_ACTIVE_EVENTS:
-            self.session_active = True
+            self._sessions.add(session_id)
         elif event in _SESSION_END_EVENTS:
-            self.session_active = False
+            self._sessions.discard(session_id)
 
         reaction = EVENT_REACTION.get(event)
         # No transient reaction (SessionEnd) — settle straight to the base anim.

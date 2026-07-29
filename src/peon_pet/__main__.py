@@ -133,7 +133,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         state.anim_changed.connect(win.play)
         win.finished.connect(state.on_finished)
         if args.event != 'idle':
-            state.handle_event(args.event)
+            state.handle_event(args.event, 'cli')
         if args.watch is not None:
             watcher = StateWatcher(args.watch)
             watcher.event_triggered.connect(state.handle_event)

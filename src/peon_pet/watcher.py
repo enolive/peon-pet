@@ -1,4 +1,4 @@
-"""Polls peon-ping's .state.json and emits raw event-name signals."""
+"""Polls peon-ping's .state.json and emits (event, session_id) signals."""
 
 from __future__ import annotations
 
@@ -14,15 +14,17 @@ POLL_INTERVAL_MS = 500
 
 @final
 class StateWatcher(QtCore.QObject):
-    """Polls peon-ping's state file (mtime-based) and emits event_triggered(str).
+    """Polls peon-ping's state file (mtime-based) and emits event_triggered(str, str).
 
-    Emits the raw event name; the state machine decides what to do with it.
+    Emits (raw event name, session id); the state machine decides what to do
+    with them. The session id lets the state machine track multiple concurrent
+    sessions without one session's Stop zeroing the liveness flag for the others.
 
     peon-ping writes .state.json atomically (tempfile + os.replace), which breaks
     QFileSystemWatcher's inode-based watch — so we poll mtime instead.
     """
 
-    event_triggered = QtCore.pyqtSignal(str)
+    event_triggered = QtCore.pyqtSignal(str, str)
 
     def __init__(self, path: Path = DEFAULT_STATE_PATH, parent: QtCore.QObject | None = None) -> None:
         super().__init__(parent)
@@ -48,11 +50,13 @@ class StateWatcher(QtCore.QObject):
         last_active = self._read_last_active()
         if last_active is None:
             return
-        self._last_timestamp = self._ts(last_active)
-        event = last_active.get("event")
-        if not isinstance(event, str):
+        ts = self._ts(last_active)
+        self._last_timestamp = ts
+        ev = _field(last_active, "event")
+        sid = _field(last_active, "session_id")
+        if ev is None or sid is None:
             return
-        self.event_triggered.emit(event)
+        self.event_triggered.emit(ev, sid)
 
     def _poll(self) -> None:
         mtime = self._mtime()
@@ -66,10 +70,11 @@ class StateWatcher(QtCore.QObject):
         if ts <= self._last_timestamp:
             return
         self._last_timestamp = ts
-        event = last_active.get("event")
-        if not isinstance(event, str):
+        ev = _field(last_active, "event")
+        sid = _field(last_active, "session_id")
+        if ev is None or sid is None:
             return
-        self.event_triggered.emit(event)
+        self.event_triggered.emit(ev, sid)
 
     @staticmethod
     def _ts(last_active: dict[str, object]) -> float:
@@ -93,3 +98,8 @@ class StateWatcher(QtCore.QObject):
         if not isinstance(last_active, dict):
             return None
         return last_active
+
+
+def _field(last_active: dict[str, object], key: str) -> str | None:
+    v = last_active.get(key)
+    return v if isinstance(v, str) else None
