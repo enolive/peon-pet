@@ -6,7 +6,7 @@ from typing import override
 
 from PyQt6 import QtCore, QtGui, QtWidgets
 
-from .config import ANIM_CONFIG
+from .config import ANIM_CONFIG, ASSETS, ATLAS_LAYOUTS, Anim
 
 WIN_SIZE: int = 200
 SPRITE_SIZE: int = 180  # inset like the JS (PlaneGeometry 180 in a 200 win)
@@ -19,7 +19,7 @@ class PetWindow(QtWidgets.QWidget):
     cell_w: float
     cell_h: float
     reaction_loops: int
-    anim: str
+    anim: Anim
     row: int
     max_frames: int
     loop: bool
@@ -29,12 +29,9 @@ class PetWindow(QtWidgets.QWidget):
 
     def __init__(
             self,
-            atlas_pixmap: QtGui.QPixmap,
-            border_pixmap: QtGui.QPixmap | None,
-            atlas_cols: int,
-            atlas_rows: int,
-            start_anim: str,
-            reaction_loops: int = 3,
+            atlas: str,
+            loops: int = 3,
+            start_anim: Anim = Anim.SLEEPING,
     ) -> None:
         super().__init__()
         self.setWindowFlags(
@@ -45,17 +42,26 @@ class PetWindow(QtWidgets.QWidget):
         self.setAttribute(QtCore.Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setFixedSize(WIN_SIZE, WIN_SIZE)
 
-        self.atlas = atlas_pixmap
-        self.border = border_pixmap
-        self.cell_w = self.atlas.width() / atlas_cols
-        self.cell_h = self.atlas.height() / atlas_rows
-        self.reaction_loops = reaction_loops
+        # Load atlas + border assets from the configured layout.
+        filename, cols, rows, border_file = ATLAS_LAYOUTS[atlas]
+        self.atlas = QtGui.QPixmap(str(ASSETS / filename))
+        if self.atlas.isNull():
+            raise RuntimeError(f"failed to load atlas: {filename}")
+        if border_file is not None:
+            self.border = QtGui.QPixmap(str(ASSETS / border_file))
+            if self.border.isNull():
+                raise RuntimeError(f"failed to load border: {border_file}")
+        else:
+            self.border = None
+        self.cell_w = self.atlas.width() / cols
+        self.cell_h = self.atlas.height() / rows
+        self.reaction_loops = loops
 
         self.frame = 0
         self.timer = QtCore.QTimer(self)
         _ = self.timer.timeout.connect(self.advance)
         # Play the initial event (or idle) once at startup.
-        self._play(start_anim)
+        self.play(start_anim)
 
         # Bottom-left corner of the work area
         screen = QtWidgets.QApplication.primaryScreen()
@@ -63,11 +69,11 @@ class PetWindow(QtWidgets.QWidget):
             geo = screen.availableGeometry()
             self.move(geo.x() + 20, geo.bottom() - WIN_SIZE - 20)
 
-    def _play(self, anim: str) -> None:
-        """Start playing `anim`. Event anims play REACTION_LOOPS times then return to sleeping."""
+    def play(self, anim: Anim) -> None:
+        """Start playing `anim`. Event anims play `reaction_loops` times then return to sleeping."""
         self.anim = anim
         self.row, self.max_frames, fps, self.loop = ANIM_CONFIG[anim]
-        self.remaining_loops = 0 if anim == 'sleeping' else self.reaction_loops - 1
+        self.remaining_loops = 0 if anim == Anim.SLEEPING else self.reaction_loops - 1
         self.frame = 0
         self.timer.setInterval(int(1000 / fps))
         if not self.timer.isActive():
@@ -84,7 +90,7 @@ class PetWindow(QtWidgets.QWidget):
                     self.frame = 0
                 else:
                     # Event finished — return to idle
-                    self._play('sleeping')
+                    self.play(Anim.SLEEPING)
                     self.update()
                     return
         self.update()

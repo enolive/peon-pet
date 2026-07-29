@@ -1,4 +1,4 @@
-"""Entry point: parse args, load assets, run the Qt event loop."""
+"""Entry point: parse args, run the Qt event loop."""
 
 from __future__ import annotations
 
@@ -7,18 +7,17 @@ import signal
 import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
-from importlib.resources.abc import Traversable
 
-from PyQt6 import QtCore, QtGui, QtWidgets
+from PyQt6 import QtCore, QtWidgets
 
-from .config import ASSETS, ATLAS_LAYOUTS, ANIM_CONFIG, EVENT_TO_ANIM
+from .config import ATLAS_LAYOUTS, ANIM_CONFIG, EVENT_TO_ANIM, Anim
 from .window import PetWindow
 
 
-def _resolve_atlas(arg: str) -> Traversable:
-    """Resolve a literal short name to a Path, or list available and exit."""
+def _resolve_atlas(arg: str) -> None:
+    """Validate the atlas short name, or list available and exit."""
     if arg in ATLAS_LAYOUTS:
-        return ASSETS / ATLAS_LAYOUTS[arg][0]
+        return
     print(f"atlas not found: {arg!r}", file=sys.stderr)
     print("available atlases (--atlas <name>):", file=sys.stderr)
     sorted_layouts = sorted(ATLAS_LAYOUTS.items())
@@ -29,10 +28,10 @@ def _resolve_atlas(arg: str) -> Traversable:
     sys.exit(1)
 
 
-def _resolve_event(arg: str, atlas_rows: int) -> str:
-    """Resolve an event name to an anim name, or list available and exit."""
+def _resolve_event(arg: str, atlas_rows: int) -> Anim:
+    """Resolve an event name to an anim, or list available and exit."""
     if arg == 'idle':
-        anim = 'sleeping'
+        anim = Anim.SLEEPING
     elif arg in EVENT_TO_ANIM:
         anim = EVENT_TO_ANIM[arg]
     else:
@@ -74,25 +73,18 @@ def main(argv: Sequence[str] | None = None) -> None:
     ns = parser.parse_args(argv)
     args = CliArgs(atlas=str(ns.atlas), event=str(ns.event), loops=int(ns.loops))
 
-    atlas_file = _resolve_atlas(args.atlas)
-    _, cols, rows, border_file = ATLAS_LAYOUTS[args.atlas]
+    _resolve_atlas(args.atlas)
+    _, _, rows, _ = ATLAS_LAYOUTS[args.atlas]
     start_anim = _resolve_event(args.event, rows)
 
     app = QtWidgets.QApplication(sys.argv)
     app.setApplicationName("Peon Pet")
 
-    atlas_pixmap = QtGui.QPixmap(str(atlas_file))
-    if atlas_pixmap.isNull():
-        print("ERROR: failed to load atlas", file=sys.stderr)
+    try:
+        win = PetWindow(args.atlas, args.loops, start_anim)
+    except RuntimeError as e:
+        print(f"ERROR: {e}", file=sys.stderr)
         sys.exit(1)
-    border_pixmap: QtGui.QPixmap | None = None
-    if border_file is not None:
-        border_pixmap = QtGui.QPixmap(str(ASSETS / border_file))
-        if border_pixmap.isNull():
-            print(f"ERROR: failed to load border: {border_file}", file=sys.stderr)
-            sys.exit(1)
-
-    win = PetWindow(atlas_pixmap, border_pixmap, cols, rows, start_anim, args.loops)
     win.show()
 
     # Ctrl-C in the terminal should exit cleanly instead of being swallowed by Qt.
