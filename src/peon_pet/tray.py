@@ -16,8 +16,7 @@ from .config import ASSETS
 
 @final
 class TrayIcon(QtWidgets.QSystemTrayIcon):
-    """Peon Pet's tray icon.
-    """
+    """Peon Pet's tray icon."""
 
     on_toggle_visibility = QtCore.pyqtSignal()
     on_reset_to_idle = QtCore.pyqtSignal()

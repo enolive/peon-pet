@@ -27,7 +27,9 @@ class StateWatcher:
     QFileSystemWatcher's inode-based watch — so we poll mtime instead.
     """
 
-    def __init__(self, path: Path = DEFAULT_STATE_PATH, on_event: OnEvent | None = None) -> None:
+    def __init__(
+        self, path: Path = DEFAULT_STATE_PATH, on_event: OnEvent | None = None
+    ) -> None:
         self.path = path
         self.on_event: OnEvent = on_event if on_event is not None else _noop
         self._last_mtime: float = 0.0

@@ -31,27 +31,29 @@ from .config import Anim
 # Events that mark a session as active (→ WORKING). The working events are
 # included so a cold start mid-session recovers on the next tool use instead of
 # waiting for a SessionStart we already missed.
-_SESSION_ACTIVE_EVENTS: frozenset[str] = frozenset({
-    'SessionStart',
-    'UserPromptSubmit',
-    'PreToolUse',
-    'PostToolUse',
-})
+_SESSION_ACTIVE_EVENTS: frozenset[str] = frozenset(
+    {
+        "SessionStart",
+        "UserPromptSubmit",
+        "PreToolUse",
+        "PostToolUse",
+    }
+)
 
 # Events that end a session (→ IDLE).
-_SESSION_END_EVENTS: frozenset[str] = frozenset({'SessionEnd', 'Stop'})
+_SESSION_END_EVENTS: frozenset[str] = frozenset({"SessionEnd", "Stop"})
 
 # Peon-ping event → transient reaction anim. Events without an entry (only
 # SessionEnd) have no reaction and just settle to the base anim.
 EVENT_REACTION: dict[str, Anim] = {
-    'SessionStart': Anim.WAKING,
-    'UserPromptSubmit': Anim.TYPING,
-    'PreToolUse': Anim.TYPING,
-    'PostToolUse': Anim.TYPING,
-    'PermissionRequest': Anim.ALARMED,
-    'PreCompact': Anim.ALARMED,
-    'PostToolUseFailure': Anim.ANNOYED,
-    'Stop': Anim.CELEBRATE,
+    "SessionStart": Anim.WAKING,
+    "UserPromptSubmit": Anim.TYPING,
+    "PreToolUse": Anim.TYPING,
+    "PostToolUse": Anim.TYPING,
+    "PermissionRequest": Anim.ALARMED,
+    "PreCompact": Anim.ALARMED,
+    "PostToolUseFailure": Anim.ANNOYED,
+    "Stop": Anim.CELEBRATE,
 }
 
 # Every event peon-pet understands (for validation / --help listing).
