@@ -4,13 +4,14 @@ from importlib.resources import files
 
 ASSETS = files(__package__) / "assets"
 
-# Known atlases: short name -> (filename, cols, rows). Add new atlases here.
+# Known atlases: short name -> (filename, cols, rows, border_filename).
+# border_filename is None when no border asset exists for that atlas.
 ATLAS_LAYOUTS = {
-    "peon":        ("peon-atlas.png",               6, 6),
-    "orc":         ("orc-sprite-atlas.png",         6, 6),
-    "capybara":    ("capybara-sprite-atlas.png",    6, 6),
-    "hello-kitty": ("hello-kitty-sprite-atlas.png", 6, 6),
-    "laptop-guy":  ("laptop-guy-atlas.png",          6, 4),
+    "peon":        ("peon-atlas.png",               6, 6, None),
+    "orc":         ("orc-sprite-atlas.png",         6, 6, "orc-borders.png"),
+    "capybara":    ("capybara-sprite-atlas.png",    6, 6, "capybara-borders.png"),
+    "hello-kitty": ("hello-kitty-sprite-atlas.png", 6, 6, "hello-kitty-borders.png"),
+    "laptop-guy":  ("laptop-guy-atlas.png",          6, 4, None),
 }
 
 # Atlas row layout: anim name -> (row, frames, fps, loop)

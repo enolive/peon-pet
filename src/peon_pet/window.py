@@ -15,7 +15,7 @@ SPRITE_SIZE: int = 180  # inset like the JS (PlaneGeometry 180 in a 200 win)
 class PetWindow(QtWidgets.QWidget):
     # Class-level type declarations (assigned in __init__).
     atlas: QtGui.QPixmap
-    border: QtGui.QPixmap
+    border: QtGui.QPixmap | None
     cell_w: float
     cell_h: float
     reaction_loops: int
@@ -30,7 +30,7 @@ class PetWindow(QtWidgets.QWidget):
     def __init__(
             self,
             atlas_pixmap: QtGui.QPixmap,
-            border_pixmap: QtGui.QPixmap,
+            border_pixmap: QtGui.QPixmap | None,
             atlas_cols: int,
             atlas_rows: int,
             start_anim: str,
@@ -100,6 +100,7 @@ class PetWindow(QtWidgets.QWidget):
         src = QtCore.QRectF(self.frame * self.cell_w, self.row * self.cell_h, self.cell_w, self.cell_h)
         p.drawPixmap(QtCore.QRectF(sx, sy, SPRITE_SIZE, SPRITE_SIZE), self.atlas, src)
 
-        # Border: full atlas border image stretched to the window
-        p.drawPixmap(QtCore.QRectF(self.rect()), self.border,
-                     QtCore.QRectF(0, 0, self.border.width(), self.border.height()))
+        # Border: full atlas border image stretched to the window (if configured)
+        if self.border is not None:
+            p.drawPixmap(QtCore.QRectF(self.rect()), self.border,
+                         QtCore.QRectF(0, 0, self.border.width(), self.border.height()))

@@ -22,9 +22,9 @@ def _resolve_atlas(arg: str) -> Traversable:
     print(f"atlas not found: {arg!r}", file=sys.stderr)
     print("available atlases (--atlas <name>):", file=sys.stderr)
     sorted_layouts = sorted(ATLAS_LAYOUTS.items())
-    layout: tuple[str, tuple[str, int, int]]
+    layout: tuple[str, tuple[str, int, int, str | None]]
     for layout in sorted_layouts:
-        name, (_, cols, rows) = layout
+        name, (_, cols, rows, _) = layout
         print(f"  {name:14s} {cols}x{rows}", file=sys.stderr)
     sys.exit(1)
 
@@ -75,17 +75,22 @@ def main(argv: Sequence[str] | None = None) -> None:
     args = CliArgs(atlas=str(ns.atlas), event=str(ns.event), loops=int(ns.loops))
 
     atlas_file = _resolve_atlas(args.atlas)
-    _, cols, rows = ATLAS_LAYOUTS[args.atlas]
+    _, cols, rows, border_file = ATLAS_LAYOUTS[args.atlas]
     start_anim = _resolve_event(args.event, rows)
 
     app = QtWidgets.QApplication(sys.argv)
     app.setApplicationName("Peon Pet")
 
     atlas_pixmap = QtGui.QPixmap(str(atlas_file))
-    border_pixmap = QtGui.QPixmap(str(ASSETS / "orc-borders.png"))
-    if atlas_pixmap.isNull() or border_pixmap.isNull():
-        print("ERROR: failed to load atlas or border", file=sys.stderr)
+    if atlas_pixmap.isNull():
+        print("ERROR: failed to load atlas", file=sys.stderr)
         sys.exit(1)
+    border_pixmap: QtGui.QPixmap | None = None
+    if border_file is not None:
+        border_pixmap = QtGui.QPixmap(str(ASSETS / border_file))
+        if border_pixmap.isNull():
+            print(f"ERROR: failed to load border: {border_file}", file=sys.stderr)
+            sys.exit(1)
 
     win = PetWindow(atlas_pixmap, border_pixmap, cols, rows, start_anim, args.loops)
     win.show()
