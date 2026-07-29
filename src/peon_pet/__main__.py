@@ -16,6 +16,7 @@ from PyQt6 import QtCore, QtWidgets
 
 from .config import ATLAS_LAYOUTS, ANIM_CONFIG, Anim, AtlasLayout
 from .state import EVENT_REACTION, KNOWN_EVENTS, PetStateMachine
+from .tray import TrayIcon
 from .watcher import DEFAULT_STATE_PATH, StateWatcher
 from .window import PetWindow
 
@@ -121,16 +122,19 @@ def main(argv: Sequence[str] | None = None) -> None:
         sys.exit(1)
     win.show()
 
+    tray = TrayIcon(app)
+    tray.on_toggle_visibility.connect(win.toggle_visibility)
+    tray.show()
+
     # Ctrl-C in the terminal should exit cleanly instead of being swallowed by Qt.
-    _ = signal.signal(signal.SIGINT, lambda *_: app.quit())
-    # Let the Python interpreter see signals while Qt's event loop runs.
-    timer = QtCore.QTimer()  # noqa: keep a reference
+    signal.signal(signal.SIGINT, lambda *_: app.quit())
+    timer = QtCore.QTimer()
     timer.start(200)
 
     def _no_op() -> None:
         pass
 
-    _ = timer.timeout.connect(_no_op)
+    timer.timeout.connect(_no_op)
 
     if args.demo:
         # Cycle through every animation every 3s to exercise play() at runtime.
@@ -142,7 +146,7 @@ def main(argv: Sequence[str] | None = None) -> None:
 
         demo_timer = QtCore.QTimer()
         demo_timer.start(3000)
-        _ = demo_timer.timeout.connect(_cycle)
+        demo_timer.timeout.connect(_cycle)
     else:
         state = PetStateMachine()
         seam = _Seam()
@@ -153,6 +157,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         # window → state: window.finished fires on the GUI thread; state is
         # thread-safe (locked), so a direct connection is fine.
         win.finished.connect(state.on_finished)
+        tray.on_reset_to_idle.connect(state.clear)
         if args.event != 'idle':
             state.handle_event(args.event, 'cli')
         if args.watch is not None:

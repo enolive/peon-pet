@@ -44,14 +44,14 @@ _SESSION_END_EVENTS: frozenset[str] = frozenset({'SessionEnd', 'Stop'})
 # Peon-ping event → transient reaction anim. Events without an entry (only
 # SessionEnd) have no reaction and just settle to the base anim.
 EVENT_REACTION: dict[str, Anim] = {
-    'SessionStart':       Anim.WAKING,
-    'UserPromptSubmit':   Anim.TYPING,
-    'PreToolUse':         Anim.TYPING,
-    'PostToolUse':        Anim.TYPING,
-    'PermissionRequest':  Anim.ALARMED,
-    'PreCompact':         Anim.ALARMED,
+    'SessionStart': Anim.WAKING,
+    'UserPromptSubmit': Anim.TYPING,
+    'PreToolUse': Anim.TYPING,
+    'PostToolUse': Anim.TYPING,
+    'PermissionRequest': Anim.ALARMED,
+    'PreCompact': Anim.ALARMED,
     'PostToolUseFailure': Anim.ANNOYED,
-    'Stop':               Anim.CELEBRATE,
+    'Stop': Anim.CELEBRATE,
 }
 
 # Every event peon-pet understands (for validation / --help listing).
@@ -90,6 +90,12 @@ class _SessionRegistry:
     def active(self) -> bool:
         with self._lock:
             return bool(self.sessions)
+
+    def clear(self) -> bool:
+        with self._lock:
+            was_active = bool(self.sessions)
+            self.sessions.clear()
+            return was_active
 
 
 @final
@@ -151,6 +157,11 @@ class PetStateMachine:
     def on_finished(self) -> None:
         """Called when the window finishes playing a transient reaction."""
         self.on_anim_changed(self.base_anim)
+
+    def clear(self) -> None:
+        """Reset the state to idle."""
+        if self._sessions.clear():
+            self.on_anim_changed(self.base_anim)
 
 
 def _noop(_anim: Anim) -> None:

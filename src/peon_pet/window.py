@@ -2,17 +2,51 @@
 
 from __future__ import annotations
 
-import json
-import os
-from pathlib import Path
 from typing import final, override
 
 from PyQt6 import QtCore, QtGui, QtWidgets
 
 from .config import ANIM_CONFIG, ASSETS, ATLAS_LAYOUTS, Anim
+from .prefs import Prefs
 
 WIN_SIZE: int = 200
 SPRITE_SIZE: int = 180  # inset like the JS (PlaneGeometry 180 in a 200 win)
+
+
+def _config_path() -> Path:
+    """XDG config path for user prefs (window position, etc.)."""
+    xdg = os.environ.get("XDG_CONFIG_HOME")
+    base = Path(xdg) if xdg else Path.home() / ".config"
+    return base / "peon-pet" / "config.json"
+
+
+def _load_pos() -> QtCore.QPoint | None:
+    """Read saved window position, or None if absent/invalid."""
+    try:
+        data = json.loads(_config_path().read_text())
+    except (OSError, ValueError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    w = data.get("window")
+    if not isinstance(w, dict):
+        return None
+    x, y = w.get("x"), w.get("y")
+    if isinstance(x, int) and isinstance(y, int):
+        return QtCore.QPoint(x, y)
+    return None
+
+
+def _save_pos(pos: QtCore.QPoint) -> None:
+    """Persist window position into the config file (merging existing keys)."""
+    p = _config_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        data = json.loads(p.read_text())
+    except (OSError, ValueError):
+        data = {}
+    data["window"] = {"x": pos.x(), "y": pos.y()}
+    p.write_text(json.dumps(data, indent=2))
 
 
 def _config_path() -> Path:
@@ -74,8 +108,7 @@ class PetWindow(QtWidgets.QWidget):
 
     def __init__(
             self,
-            atlas: str,
-            loops: int = 3,
+            prefs: Prefs,
             start_anim: Anim = Anim.SLEEPING,
     ) -> None:
         super().__init__()
@@ -87,6 +120,8 @@ class PetWindow(QtWidgets.QWidget):
         self.setAttribute(QtCore.Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setFixedSize(WIN_SIZE, WIN_SIZE)
 
+        atlas = prefs.atlas
+        loops = prefs.loops
         # Load atlas + border assets from the configured layout.
         layout = ATLAS_LAYOUTS[atlas]
         self.atlas = QtGui.QPixmap(str(ASSETS / layout.filename))
@@ -102,6 +137,7 @@ class PetWindow(QtWidgets.QWidget):
         self.cell_w = self.atlas.width() / layout.cols
         self.cell_h = self.atlas.height() / layout.rows
         self.loops = loops
+        self._prefs = prefs
 
         self.frame = 0
         self._loops_played = 0
@@ -112,7 +148,7 @@ class PetWindow(QtWidgets.QWidget):
         self.play(start_anim)
 
         # Position: saved overrides the default bottom-left corner.
-        saved = _load_pos()
+        saved = prefs.position.current
         if saved is not None and QtWidgets.QApplication.screenAt(saved) is not None:
             self.move(saved)
         else:
@@ -155,6 +191,9 @@ class PetWindow(QtWidgets.QWidget):
                 self.frame = 0
         self.update()
 
+    def toggle_visibility(self) -> None:
+        self.setVisible(not self.isVisible())
+
     @override
     def mousePressEvent(self, a0: QtGui.QMouseEvent | None) -> None:
         if a0 is not None and a0.button() == QtCore.Qt.MouseButton.LeftButton:
@@ -173,7 +212,7 @@ class PetWindow(QtWidgets.QWidget):
         if (a0 is not None and a0.button() == QtCore.Qt.MouseButton.LeftButton
                 and self._drag_offset is not None):
             self._drag_offset = None
-            _save_pos(self.pos())
+            self._prefs.position.save(self.pos())
             a0.accept()
 
     @override
