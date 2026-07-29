@@ -1,0 +1,12 @@
+<component name="InspectionProjectProfileManager">
+  <profile version="1.0">
+    <option name="myName" value="Project Default" />
+    <!--
+      This project is uv-managed with dependencies declared in pyproject.toml
+      [project].dependencies (pinned via uv.lock). PyPackageRequirementsInspection
+      only honors a requirements.txt-style "Package requirements file" and produces
+      false positives for pyproject-only projects (PY-70371, PY-60068), so disable it.
+    -->
+    <inspection_tool class="PyPackageRequirementsInspection" enabled="false" level="WARNING" enabled_by_default="false" />
+  </profile>
+</component>
