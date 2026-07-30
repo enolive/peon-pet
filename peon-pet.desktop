@@ -7,3 +7,4 @@ Icon=peon-pet
 Terminal=false
 Categories=Utility;Amusement;
 Keywords=pet;peon;ping;companion;
+StartupNotify=false

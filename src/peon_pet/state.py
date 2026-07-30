@@ -111,9 +111,8 @@ class _SessionRegistry:
         """Flip a session's task to IDLE (task done, session still alive).
 
         Registers the session if unknown: a cold-start replay of e.g. `Stop`
-        must still track the session (the watcher saw it), even though we play
-        `waking` instead of the reaction. Otherwise the session never lands in
-        the registry and the badge stays 0.
+        must still track the session (the watcher saw it), so the badge reflects
+        it.
         """
         with self._lock:
             self._sessions[session_id] = (_SessionState.IDLE, time.time())
@@ -174,13 +173,27 @@ class PetStateMachine:
     def handle_event(self, event: str, session_id: str) -> None:
         """Process a peon-ping event, emitting the appropriate anim.
 
-        Cold-start special case: if the session is unknown, this event is a
-        replay of the last peon-ping event on startup (the watcher emits the
-        current state once on start). Replaying e.g. a stale `Stop` would
-        spuriously celebrate. Instead treat an unknown session like a fresh
-        `SessionStart` — play `waking` — but still apply the event's real state
-        transition, so the base anim is correct once waking finishes (typing for
-        a working event, sleeping for `Stop`).
+        Cold start
+        -----------
+        The watcher replays the last peon-ping event once on startup, when the
+        registry is empty, so the pet's first event for a session arrives with
+        no prior `SessionStart`. A cold start is such a first event for a session
+        the registry had never tracked: detected by checking `__contains__`
+        *before* the update (`cold_start`).
+
+        Working/`Stop` events also register an unknown session (alive-if-new
+        recovery, so the badge isn't 0 for a cold `Stop`), so a cold start that
+        lands a session in the registry — `SessionStart`, or any working/`Stop`
+        event on a new session — means a session genuinely exists now. We
+        announce it with `waking` regardless of the event's own reaction, so a
+        cold `Stop` doesn't spuriously celebrate and a cold working event doesn't
+        jump straight to `typing` without a wake.
+
+        The exception is a cold `SessionEnd` replay: the session was never
+        tracked and `discard` leaves it absent, so there's nothing to wake for
+        and nothing to reflect — it falls through to `resolve_anim`, which has
+        no `SessionEnd` reaction and settles to the base anim (sleeping). Live
+        events for already-tracked sessions keep their normal reaction.
         """
         if event not in KNOWN_EVENTS:
             print(f"peon-pet: unknown peon-ping event {event!r}", file=sys.stderr)
@@ -198,10 +211,12 @@ class PetStateMachine:
         elif event in _SESSION_END_EVENTS:
             self._sessions.discard(session_id)
 
-        anim = Anim.WAKING if cold_start else self.resolve_anim(event)
+        was_session_added = session_id in self._sessions
+        if cold_start and was_session_added:
+            anim = Anim.WAKING
+        else:
+            anim = self.resolve_anim(event)
 
-        # Emit outside the lock — the callback (a Qt signal emit) is non-blocking,
-        # and not holding the lock means a callback that re-entered state wouldn't deadlock.
         self.on_anim_changed(anim)
         self.on_session_count_changed(self._sessions.count)
 
