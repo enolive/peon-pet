@@ -32,6 +32,7 @@ class _Seam(QtCore.QObject):
     """
 
     anim_changed = QtCore.pyqtSignal(Anim)
+    session_count_changed = QtCore.pyqtSignal(int)
 
 
 def _print_event_anim_mapping() -> None:
@@ -148,7 +149,9 @@ def main(argv: Sequence[str] | None = None) -> None:
         # we need to marshal state events onto the GUI thread.
         seam = _Seam()
         state.on_anim_changed = seam.anim_changed.emit
+        state.on_session_count_changed = seam.session_count_changed.emit
         seam.anim_changed.connect(win.play)
+        seam.session_count_changed.connect(win.set_session_count)
         win.finished.connect(state.on_finished)
         tray.on_reset_to_idle.connect(state.clear)
         watcher = StateWatcher(args.watch)

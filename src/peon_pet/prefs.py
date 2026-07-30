@@ -3,8 +3,8 @@
 Owns the config file and the resolution/validation of its values. Two clearly
 separated categories:
 
-- Read-only:   `atlas`, `loops`. User edits the file; the app never writes these.
-- Volatile:    `position` (window position). App reads on start, writes on drag.
+- Read-only: `atlas`, `loops`. User edits the file; the app never writes these.
+- Volatile: `position` (window position). App reads on start, writes on drag.
 """
 
 from __future__ import annotations
@@ -80,6 +80,8 @@ class Prefs:
         if a is None:
             return DEFAULT_ATLAS
         available = ", ".join(sorted(ATLAS_LAYOUTS))
+        # this is an error message, nothing to be 100% useful
+        # noinspection string-conversion-without-dunder-method
         raise ValueError(f"config 'atlas' {a!r} is not valid; available: {available}")
 
     @staticmethod

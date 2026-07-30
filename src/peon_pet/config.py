@@ -44,13 +44,7 @@ class AnimConfig:
 # Known atlases: short name -> layout. border defaults to None when absent.
 ATLAS_LAYOUTS: dict[str, AtlasLayout] = {
     "2b": AtlasLayout("2b-atlas.png", 6, 6, "2b-borders.png"),
-    "peon": AtlasLayout("peon-atlas.png", 6, 6),
     "orc": AtlasLayout("orc-sprite-atlas.png", 6, 6, "orc-borders.png"),
-    "capybara": AtlasLayout("capybara-sprite-atlas.png", 6, 6, "capybara-borders.png"),
-    "hello-kitty": AtlasLayout(
-        "hello-kitty-sprite-atlas.png", 6, 6, "hello-kitty-borders.png"
-    ),
-    "laptop-guy": AtlasLayout("laptop-guy-atlas.png", 6, 4),
 }
 
 # Atlas row layout: anim -> config.

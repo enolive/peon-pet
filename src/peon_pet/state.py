@@ -5,21 +5,26 @@ It calls a single outbound callback (`on_anim_changed`) whenever the target
 anim changes; the caller decides what to do with it (typically marshal to a
 GUI thread via a seam signal).
 
-Session model
--------------
-- IDLE:    no session active — base anim is SLEEPING.
-- WORKING: at least one session is active — base anim is TYPING.
+Two-state model, one registry
+----------------------------
+Each known session is one entry in `_SessionRegistry`, carrying a per-session
+state plus a last-seen timestamp:
 
-SessionStart / working events (tool use, prompt submit) add the session to
-the active set; Stop / SessionEnd remove *that session only*. Each session's
-last-seen timestamp is recorded (local `time.time()`), so a future staleness
-sweep can reap sessions whose end event was lost. Multiple concurrent agents
-are tracked correctly: one session finishing does not zero the liveness flag
-for the others.
+- IDLE:   session alive, not currently working (e.g. just after SessionStart,
+          or after a Stop completed the task).
+- ACTIVE: session working (UserPromptSubmit / PreToolUse / PostToolUse).
+
+`SessionStart` adds a session (IDLE); working events flip it to ACTIVE; `Stop`
+flips it back to IDLE (task done, session still alive); `SessionEnd` removes it.
+
+Base anim is TYPING if any session is ACTIVE, else SLEEPING. So after a Stop
+the pet sleeps (task done) even while the session is still open — the badge
+(session count) disambiguates "no session" from "idle-but-present".
 """
 
 from __future__ import annotations
 
+import enum
 import sys
 import threading
 import time
@@ -28,20 +33,35 @@ from typing import final
 
 from .config import Anim
 
-# Events that mark a session as active (→ WORKING). The working events are
-# included so a cold start mid-session recovers on the next tool use instead of
-# waiting for a SessionStart we already missed.
-_SESSION_ACTIVE_EVENTS: frozenset[str] = frozenset(
+
+class _SessionState(enum.Enum):
+    """Per-session task state."""
+
+    IDLE = "idle"
+    ACTIVE = "active"
+
+
+# Events that start a session (→ added to the registry as IDLE). Only SessionStart;
+# working events below mark a session ACTIVE (and alive-if-new) instead.
+_SESSION_START_EVENTS: frozenset[str] = frozenset({"SessionStart"})
+
+# Events that flip a session's task to ACTIVE (→ TYPING). Also marks the
+# session alive if new, so a cold start mid-session recovers on the next
+# tool use instead of waiting for a SessionStart we already missed.
+_TASK_ACTIVE_EVENTS: frozenset[str] = frozenset(
     {
-        "SessionStart",
         "UserPromptSubmit",
         "PreToolUse",
         "PostToolUse",
     }
 )
 
-# Events that end a session (→ IDLE).
-_SESSION_END_EVENTS: frozenset[str] = frozenset({"SessionEnd", "Stop"})
+# Events that flip a session's task to IDLE (→ SLEEPING). Stop completes the
+# current task but does not end the session.
+_TASK_IDLE_EVENTS: frozenset[str] = frozenset({"Stop"})
+
+# Events that end a session (→ removed from registry). Only SessionEnd.
+_SESSION_END_EVENTS: frozenset[str] = frozenset({"SessionEnd"})
 
 # Peon-ping event → transient reaction anim. Events without an entry (only
 # SessionEnd) have no reaction and just settle to the base anim.
@@ -62,74 +82,82 @@ KNOWN_EVENTS: frozenset[str] = frozenset(EVENT_REACTION) | _SESSION_END_EVENTS
 
 @final
 class _SessionRegistry:
-    """Active sessions keyed by id, with last-seen timestamps.
+    """Known sessions keyed by id, each with a state and last-seen timestamp.
 
-    Timestamps are local `time.time()` readings taken when a session touches
-    the registry. They enable a future staleness sweep to reap sessions whose
-    end event was lost. No cleanup runs yet — the registry grows until a
-    Stop/SessionEnd lands, so `reconcile` is the seam a future timer would call.
+    No cleanup
+    runs yet — the registry grows until a SessionEnd lands, so `reconcile` is
+    the seam a future timer would call. However, we have a user reconcile action
+    to clear everything.
 
-    Thread-safe via `_lock` — the registry owns its own concurrency because the
-    lock guards its `sessions` dict. Callers (`PetStateMachine.handle_event`,
-    `on_finished`, future `reconcile`) don't take the lock; they call these
-    methods, which do. Reads via `active` also take the lock so they observe a
-    consistent snapshot.
+    Thread-safe via `_lock` — the registry owns its own concurrency.
     """
 
     def __init__(self) -> None:
-        self.sessions: dict[str, float] = {}
+        self._sessions: dict[str, tuple[_SessionState, float]] = {}
         self._lock = threading.Lock()
 
     def add(self, session_id: str) -> None:
+        """Mark a session alive (IDLE). Touches its last-seen timestamp."""
         with self._lock:
-            self.sessions[session_id] = time.time()
+            self._sessions[session_id] = (_SessionState.IDLE, time.time())
+
+    def set_active(self, session_id: str) -> None:
+        """Flip a session's task to ACTIVE. Marks it alive if new."""
+        with self._lock:
+            self._sessions[session_id] = (_SessionState.ACTIVE, time.time())
+
+    def set_idle(self, session_id: str) -> None:
+        """Flip a session's task to IDLE (task done, session still alive)."""
+        with self._lock:
+            if session_id in self._sessions:
+                self._sessions[session_id] = (_SessionState.IDLE, time.time())
 
     def discard(self, session_id: str) -> None:
+        """Remove a session (SessionEnd)."""
         with self._lock:
-            self.sessions.pop(session_id, None)
+            self._sessions.pop(session_id, None)
 
     @property
-    def active(self) -> bool:
+    def count(self) -> int:
+        """Number of known (alive) sessions — the badge value."""
         with self._lock:
-            return bool(self.sessions)
+            return len(self._sessions)
+
+    @property
+    def any_active(self) -> bool:
+        """Whether any session is ACTIVE — drives the base anim (TYPING)."""
+        with self._lock:
+            return any(
+                state is _SessionState.ACTIVE for state, _ in self._sessions.values()
+            )
 
     def clear(self) -> bool:
+        """Wipe all sessions. Returns whether any were known (for emit-on-change)."""
         with self._lock:
-            was_active = bool(self.sessions)
-            self.sessions.clear()
-            return was_active
+            had_any = bool(self._sessions)
+            self._sessions.clear()
+            return had_any
 
 
 @final
 class PetStateMachine:
-    """Owns the active-session registry and emits anim transitions via callback.
-
-    - Base anim is SLEEPING when the registry is empty, TYPING otherwise.
-    - `handle_event` updates the registry then calls `on_anim_changed` with
-      either the transient reaction anim or, for SessionEnd, the base anim.
-    - `on_finished` is called by the window when a one-shot reaction has played
-      out `loops` times; it calls `on_anim_changed` with the base anim to settle.
-
-    Thread-safe via `_lock`: `handle_event` is driven from the watcher's daemon
-    thread, `on_finished` from the GUI thread (via window.finished). The lock
-    lives on the registry — `handle_event` and `on_finished` call registry
-    methods that lock internally, and read `base_anim` (which goes through the
-    registry's locked `active`). The `on_anim_changed` callback fires after the
-    registry method returns (lock released), so a callback that re-entered state
-    wouldn't deadlock.
+    """
+    State machine that transfers session state and
+    gets the overall state for playing the correct animations.
     """
 
     def __init__(self) -> None:
         self._sessions = _SessionRegistry()
         self.on_anim_changed: Callable[[Anim], None] = _noop
+        self.on_session_count_changed: Callable[[int], None] = _noop_count
 
     @property
     def session_active(self) -> bool:
-        return self._sessions.active
+        return self._sessions.count > 0
 
     @property
     def base_anim(self) -> Anim:
-        return Anim.TYPING if self._sessions.active else Anim.SLEEPING
+        return Anim.TYPING if self._sessions.any_active else Anim.SLEEPING
 
     def handle_event(self, event: str, session_id: str) -> None:
         """Process a peon-ping event, emitting the appropriate anim."""
@@ -137,11 +165,13 @@ class PetStateMachine:
             print(f"peon-pet: unknown peon-ping event {event!r}", file=sys.stderr)
             return
 
-        # Update the active-session registry first — it determines the base
-        # anim reactions return to. End events remove only the emitting session.
-        # The registry's methods lock internally.
-        if event in _SESSION_ACTIVE_EVENTS:
+        # Update the single registry — liveness and task state together.
+        if event in _SESSION_START_EVENTS:
             self._sessions.add(session_id)
+        elif event in _TASK_ACTIVE_EVENTS:
+            self._sessions.set_active(session_id)
+        elif event in _TASK_IDLE_EVENTS:
+            self._sessions.set_idle(session_id)
         elif event in _SESSION_END_EVENTS:
             self._sessions.discard(session_id)
 
@@ -150,8 +180,13 @@ class PetStateMachine:
         # Emit outside the lock — the callback (a Qt signal emit) is non-blocking,
         # and not holding the lock means a callback that re-entered state wouldn't deadlock.
         self.on_anim_changed(anim)
+        self.on_session_count_changed(self._sessions.count)
 
     def resolve_anim(self, event: str) -> Anim:
+        """
+        Transforms the given event into an animation.
+        Falls back to base anim which depends on the overall session state.
+        """
         reaction = EVENT_REACTION.get(event)
         anim = self.base_anim if reaction is None else reaction
         return anim
@@ -164,7 +199,12 @@ class PetStateMachine:
         """Reset the state to idle."""
         if self._sessions.clear():
             self.on_anim_changed(self.base_anim)
+        self.on_session_count_changed(self._sessions.count)
 
 
 def _noop(_anim: Anim) -> None:
+    pass
+
+
+def _noop_count(_n: int) -> None:
     pass

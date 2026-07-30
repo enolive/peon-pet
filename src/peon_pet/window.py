@@ -31,6 +31,7 @@ class PetWindow(QtWidgets.QWidget):
     _loops_played: int
     timer: QtCore.QTimer
     _drag_offset: QtCore.QPoint | None
+    _session_count: int
     _prefs: Prefs
 
     # Emitted when a one-shot anim has played `loops` times. The state machine
@@ -75,6 +76,7 @@ class PetWindow(QtWidgets.QWidget):
         self.frame = 0
         self._loops_played = 0
         self._drag_offset = None
+        self._session_count = 0
         self.timer = QtCore.QTimer(self)
         _ = self.timer.timeout.connect(self.advance)
         # Play the initial event (or idle) once at startup.
@@ -155,6 +157,13 @@ class PetWindow(QtWidgets.QWidget):
     def toggle_visibility(self) -> None:
         self.setVisible(not self.isVisible())
 
+    def set_session_count(self, count: int) -> None:
+        """Update the active-session badge. Only repaints if it changed."""
+        if count == self._session_count:
+            return
+        self._session_count = count
+        self.update()
+
     @override
     def mousePressEvent(self, a0: QtGui.QMouseEvent | None) -> None:
         if a0 is not None and a0.button() == QtCore.Qt.MouseButton.LeftButton:
@@ -204,3 +213,33 @@ class PetWindow(QtWidgets.QWidget):
                 self.border,
                 QtCore.QRectF(0, 0, self.border.width(), self.border.height()),
             )
+
+        # Active-session badge (top-right), drawn last so it sits on top.
+        if self._session_count > 0:
+            self._draw_badge(p)
+
+    def _draw_badge(self, p: QtGui.QPainter) -> None:
+        """Draw a red circular badge with the session count, top-right.
+
+        Caps the displayed number at 9+ so the badge stays a fixed size.
+        """
+        text = str(self._session_count) if self._session_count <= 9 else "9+"
+        diameter = 22
+        margin = 8
+        x = WIN_SIZE - diameter - margin
+        y = margin
+        p.setPen(QtCore.Qt.PenStyle.NoPen)
+        p.setBrush(QtGui.QColor("#0c6d1a"))
+        p.drawEllipse(
+            QtCore.QPointF(x + diameter / 2, y + diameter / 2),
+            diameter / 2,
+            diameter / 2,
+        )
+        p.setPen(QtGui.QColor("white"))
+        font = QtGui.QFont("Sans", 9, QtGui.QFont.Weight.Bold)
+        p.setFont(font)
+        p.drawText(
+            QtCore.QRectF(x, y, diameter, diameter),
+            QtCore.Qt.AlignmentFlag.AlignCenter,
+            text,
+        )

@@ -5,11 +5,9 @@ panel + context menu), the window is the view (the sprite on screen). They
 share no state; `__main__` wires them together.
 """
 
-from __future__ import annotations
-
 from typing import final
 
-from PyQt6 import QtGui, QtWidgets, QtCore
+from PyQt6 import QtCore, QtGui, QtWidgets
 
 from .config import ASSETS
 
@@ -26,7 +24,7 @@ class TrayIcon(QtWidgets.QSystemTrayIcon):
         self.setToolTip("Peon Pet")
         menu = QtWidgets.QMenu()
         menu.addAction("Show/Hide", self.on_toggle_visibility)
-        menu.addAction("Reset to idle", self.on_reset_to_idle)
+        menu.addAction("Clear all sessions", self.on_reset_to_idle)
         menu.addSeparator()
         menu.addAction("Quit", app.quit)
         self.setContextMenu(menu)
