@@ -17,7 +17,7 @@ from typing import final
 from .config import ATLAS_LAYOUTS
 
 DEFAULT_LOOPS = 3
-DEFAULT_ATLAS = "orc"
+DEFAULT_ATLAS = "2b"
 
 
 def _config_path() -> Path:

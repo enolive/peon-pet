@@ -30,8 +30,8 @@ A friendly companion to [PeonPing](https://www.peonping.com/). Will read its sta
 ./install.sh
 ```
 
-Builds the wheel, installs the `peon-pet` command via `uv tool`, and drops the
-desktop entry + icon so it shows up in your app menu.
+Builds the wheel, installs the `peon-pet` command via `uv tool`, and drops the desktop entry + icon so it shows up in
+your app menu.
 
 ## Usage
 
@@ -57,7 +57,7 @@ Peon pet creates a `config.json` inside your config directory, usually `~./confi
 
 **`window`**: current position of the window on your screen. Defaults to bottom left on your primary screen.
 
-**`atlas`*: which character to use. Defaults to `orc`. There is also `2b` available.
+**`atlas`*: which character to use. Defaults to `2b`. There is also `orc` available.
 
 **`loops`**: how many times to loop an animation. Defaults to `3`.
 
