@@ -93,7 +93,7 @@ class PetWindow(QtWidgets.QWidget):
             geo = screen.availableGeometry()
             self.move(geo.x() + 20, geo.bottom() - WIN_SIZE - 20)
 
-    def play(self, anim: Anim) -> None:
+    def play(self, anim: Anim, play_forever: bool = False) -> None:
         """Switch to `anim` and render it.
 
         Looping anims (sleeping, typing) loop forever. One-shot anims
@@ -102,11 +102,16 @@ class PetWindow(QtWidgets.QWidget):
         """
         self.anim = anim
         cfg = ANIM_CONFIG[anim]
+        loop: bool
+        if play_forever:
+            loop = True
+        else:
+            loop = cfg.loop
         self.row, self.max_frames, fps, self.loop = (
             cfg.row,
             cfg.frames,
             cfg.fps,
-            cfg.loop,
+            loop,
         )
         self.frame = 0
         self._loops_played = 0

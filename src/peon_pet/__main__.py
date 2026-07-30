@@ -7,16 +7,15 @@ import signal
 import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
-from itertools import cycle
 from pathlib import Path
-
 from typing import final
 
 from PyQt6 import QtCore, QtWidgets
 
-from .config import ATLAS_LAYOUTS, ANIM_CONFIG, Anim
+from .config import ANIM_CONFIG, Anim
+from .demo import Demo
 from .prefs import Prefs
-from .state import EVENT_REACTION, KNOWN_EVENTS, PetStateMachine
+from .state import EVENT_REACTION, PetStateMachine
 from .tray import TrayIcon
 from .watcher import DEFAULT_STATE_PATH, StateWatcher
 from .window import PetWindow
@@ -35,43 +34,35 @@ class _Seam(QtCore.QObject):
     anim_changed = QtCore.pyqtSignal(Anim)
 
 
-def _resolve_event(arg: str, atlas_rows: int) -> str:
-    """Validate an event name, or list available events and exit. Returns the name."""
-    if arg == "idle":
-        return arg
-    if arg not in KNOWN_EVENTS:
-        print(f"event not found: {arg!r}", file=sys.stderr)
-        print("available events (--event <name>):", file=sys.stderr)
-        print(f"  {'idle':22s} sleeping  (row 0)", file=sys.stderr)
-        name: str
-        for name in sorted(KNOWN_EVENTS):
-            anim = EVENT_REACTION.get(name)
-            if anim is None:
-                # SessionEnd — settles to sleeping, no transient reaction.
-                print(f"  {name:22s} (→idle)   (row 0)", file=sys.stderr)
-            else:
-                row = ANIM_CONFIG[anim].row
-                avail = "ok" if row < atlas_rows else "(not in this atlas)"
-                print(f"  {name:22s} {anim:9s} (row {row}) {avail}", file=sys.stderr)
+def _print_event_anim_mapping() -> None:
+    """Print the peon-ping event → anim mapping to stdout for reference."""
+    print("event → anim mapping:")
+    for event in EVENT_REACTION:
+        anim = EVENT_REACTION[event]
+        print(f"  {event:22s} → {anim.value}")
+    # SessionEnd has no transient reaction — it removes the session and settles
+    # to the base anim (SLEEPING if none remain, else TYPING).
+    print(f"  {'SessionEnd':22s} → (settle to base: sleeping / typing)")
+
+
+def _resolve_anim(arg: str) -> Anim:
+    """Resolve an anim name, or list available anims and exit."""
+    try:
+        return Anim(arg)
+    except ValueError:
+        print(f"anim not found: {arg!r}", file=sys.stderr)
+        print("available anims (--anim <name>):", file=sys.stderr)
+        for a in Anim:
+            print(f"  {a.value:9s} (row {ANIM_CONFIG[a].row})", file=sys.stderr)
         sys.exit(1)
-    # Row-availability check for the reaction anim (if any).
-    anim = EVENT_REACTION.get(arg)
-    if anim is not None:
-        row = ANIM_CONFIG[anim].row
-        if row >= atlas_rows:
-            print(
-                f"event {arg!r} → {anim} (row {row}) is not in this atlas ({atlas_rows} rows)",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-    return arg
 
 
 @dataclass
 class CliArgs:
-    event: str
+    anim: str | None
     demo: bool
     watch: Path | None
+    list_events: bool
 
 
 def main(argv: Sequence[str] | None = None) -> None:
@@ -79,9 +70,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         prog="peon-pet",
         description="Desktop pet that reacts to peon-ping events.",
     )
-    parser.add_argument(
-        "--event", default="idle", help="event to react to on startup (default: idle)"
-    )
+    parser.add_argument("--anim", default=None, help="anim to play on startup")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument(
         "--demo",
@@ -96,21 +85,29 @@ def main(argv: Sequence[str] | None = None) -> None:
         metavar="PATH",
         help=f"watch peon-ping .state.json at PATH and react to events (default: {DEFAULT_STATE_PATH})",
     )
+    mode.add_argument(
+        "--list-events",
+        default=False,
+        action="store_true",
+        help="list all known events and their mappings to anims and exit",
+    )
     ns = parser.parse_args(argv)
     args = CliArgs(
-        event=str(ns.event),
+        anim=str(ns.anim),
         demo=bool(ns.demo),
         watch=Path(ns.watch) if ns.watch is not None else None,
+        list_events=bool(ns.list_events),
     )
+
+    if args.list_events:
+        _print_event_anim_mapping()
+        sys.exit(0)
 
     try:
         prefs = Prefs()
     except ValueError as e:
         print(f"ERROR: {e}", file=sys.stderr)
         sys.exit(1)
-    rows = ATLAS_LAYOUTS[prefs.atlas].rows
-    _resolve_event(args.event, rows)
-
     app = QtWidgets.QApplication(sys.argv)
     app.setApplicationName("Peon Pet")
 
@@ -135,35 +132,28 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     timer.timeout.connect(_no_op)
 
+    state = PetStateMachine()
+
     if args.demo:
-        # Cycle through every animation every 3s to exercise play() at runtime.
-        it = iter(cycle(Anim))
-        next(it)  # skip the one already playing as start_anim
-
-        def _cycle() -> None:
-            win.play(next(it))
-
-        demo_timer = QtCore.QTimer()
-        demo_timer.start(3000)
-        demo_timer.timeout.connect(_cycle)
-    else:
-        state = PetStateMachine()
+        # we need to marshal state events onto the GUI thread.
         seam = _Seam()
-        # state → window: cross-thread (state runs on the watcher's daemon
-        # thread), so route through the seam to marshal onto the GUI thread.
+        seam.anim_changed.connect(lambda a: win.play(a, True))
+        demo = Demo()
+        demo.on_anim_changed = seam.anim_changed.emit
+        demo.start()
+    elif args.anim:
+        anim = _resolve_anim(args.anim)
+        win.play(anim, True)
+    elif args.watch:
+        # we need to marshal state events onto the GUI thread.
+        seam = _Seam()
         state.on_anim_changed = seam.anim_changed.emit
         seam.anim_changed.connect(win.play)
-        # window → state: window.finished fires on the GUI thread; state is
-        # thread-safe (locked), so a direct connection is fine.
         win.finished.connect(state.on_finished)
         tray.on_reset_to_idle.connect(state.clear)
-        if args.event != "idle":
-            state.handle_event(args.event, "cli")
-        if args.watch is not None:
-            watcher = StateWatcher(args.watch)
-            # watcher daemon thread → state (pure Python, direct; no marshal).
-            watcher.on_event = state.handle_event
-            watcher.start()
+        watcher = StateWatcher(args.watch)
+        watcher.on_event = state.handle_event
+        watcher.start()
 
     sys.exit(app.exec())
 

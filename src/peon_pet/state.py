@@ -49,10 +49,10 @@ EVENT_REACTION: dict[str, Anim] = {
     "SessionStart": Anim.WAKING,
     "UserPromptSubmit": Anim.TYPING,
     "PreToolUse": Anim.TYPING,
-    "PostToolUse": Anim.TYPING,
     "PermissionRequest": Anim.ALARMED,
-    "PreCompact": Anim.ALARMED,
+    "PostToolUse": Anim.TYPING,
     "PostToolUseFailure": Anim.ANNOYED,
+    "PreCompact": Anim.ALARMED,
     "Stop": Anim.CELEBRATE,
 }
 
@@ -145,16 +145,16 @@ class PetStateMachine:
         elif event in _SESSION_END_EVENTS:
             self._sessions.discard(session_id)
 
-        # Decide the anim to emit. (Mutation and this read are both locked at the
-        # registry level, not as one atomic op across both — a concurrent event
-        # could land between them. That's benign: the window plays this anim and
-        # the next event overrides, same as any event-driven UI.)
-        reaction = EVENT_REACTION.get(event)
-        anim = self.base_anim if reaction is None else reaction
+        anim = self.resolve_anim(event)
 
         # Emit outside the lock — the callback (a Qt signal emit) is non-blocking,
         # and not holding the lock means a callback that re-entered state wouldn't deadlock.
         self.on_anim_changed(anim)
+
+    def resolve_anim(self, event: str) -> Anim:
+        reaction = EVENT_REACTION.get(event)
+        anim = self.base_anim if reaction is None else reaction
+        return anim
 
     def on_finished(self) -> None:
         """Called when the window finishes playing a transient reaction."""
