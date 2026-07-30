@@ -21,8 +21,9 @@ A friendly companion to [PeonPing](https://www.peonping.com/). Will read its sta
 > [!NOTE]
 > Multiple-session support is best effort only. Peon Ping does not keep track of this, so we
 > have no agent-agnostic way to reliably identify them all.
-> If you start the pet, it will not detect any already started sessions, but will try to catch up on any activity.
-> If you believe the number is totally of, you can reset them via the Tray Control.
+> If you start the pet, it will try to detect any already started sessions, but that might not be always accurate.
+> It will also try to catch up on any activity.
+> If you believe the number of active sessions is totally of, you can reset them via the Tray Control.
 
 ## Installation
 
@@ -85,3 +86,14 @@ Refer to `peon-pet --list-events`. It maps Claude-style Events to animations.
 - OpenPeon sound pack https://openpeon.com/packs/nier-2b
 
 For more funny stuff, check out my main GitHub Repo: https://github.com/enolive
+
+## Inspiration
+
+Original idea from the PeonPing project: https://github.com/peonPing/peon-pet. Sadly tightly coupled to Claude Code.
+
+## Disclaimer
+
+All existing images were AI-generated. I take no credit for them. The orc sprite set comes from the OG peon pet.
+
+The 2b sprite map was edited and assembled by me using images from Gemini
+and [LibreSprite](https://libresprite.github.io/#!/). You can find the original sprite sheets in the assets folder.
