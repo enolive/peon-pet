@@ -93,7 +93,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     )
     ns = parser.parse_args(argv)
     args = CliArgs(
-        anim=str(ns.anim),
+        anim=str(ns.anim) if ns.anim is not None else None,
         demo=bool(ns.demo),
         watch=Path(ns.watch) if ns.watch is not None else None,
         list_events=bool(ns.list_events),

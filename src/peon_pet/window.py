@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from typing import final, override
 
 from PyQt6 import QtCore, QtGui, QtWidgets
@@ -21,6 +22,7 @@ class PetWindow(QtWidgets.QWidget):
     cell_w: float
     cell_h: float
     loops: int
+    _rows: int
     anim: Anim
     row: int
     max_frames: int
@@ -66,7 +68,9 @@ class PetWindow(QtWidgets.QWidget):
         self.cell_w = self.atlas.width() / layout.cols
         self.cell_h = self.atlas.height() / layout.rows
         self.loops = loops
+        self._rows = layout.rows
         self._prefs = prefs
+        self._warn_missing_anims(atlas)
 
         self.frame = 0
         self._loops_played = 0
@@ -107,17 +111,28 @@ class PetWindow(QtWidgets.QWidget):
             loop = True
         else:
             loop = cfg.loop
-        self.row, self.max_frames, fps, self.loop = (
-            cfg.row,
-            cfg.frames,
-            cfg.fps,
-            loop,
-        )
+        self.row = min(cfg.row, self._rows - 1)
+        self.max_frames = cfg.frames
+        fps = cfg.fps
+        self.loop = loop
         self.frame = 0
         self._loops_played = 0
         self.timer.setInterval(int(1000 / fps))
         if not self.timer.isActive():
             self.timer.start()
+
+    def _warn_missing_anims(self, atlas: str) -> None:
+        """Warn once at startup about anims the atlas can't render (too few rows)."""
+        missing = [a for a in Anim if ANIM_CONFIG[a].row >= self._rows]
+        if not missing:
+            return
+        names = ", ".join(f"{a.value} (row {ANIM_CONFIG[a].row})" for a in missing)
+        msg = (
+            f"peon-pet: atlas {atlas!r} has {self._rows} row(s); "
+            f"{len(missing)} anim(s) have no sprite and will fall back to row 0: "
+            f"{names}"
+        )
+        print(msg, file=sys.stderr)
 
     def advance(self) -> None:
         self.frame += 1

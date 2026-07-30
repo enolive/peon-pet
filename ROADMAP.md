@@ -35,9 +35,13 @@ The `.desktop` and icon get bundled via `force-include` (the asset case that
 `src/peon_pet/` or are explicitly meant as installable resources).
 
 **Uninstall.** `peon-pet --uninstall` — a flag on the executable that forwards
-  to `uninstall.sh` (so the uninstall logic lives in one shell script, not
-  duplicated in Python). The flag just locates the script (bundled alongside or
-  resolved from the installed package) and `exec`s it.
+  to `uninstall.sh`. The script is installed by `install.sh` to
+  `~/.local/bin/peon-pet-uninstall.sh` (next to the `peon-pet` entry point),
+  *not* bundled inside the wheel — so the uninstall works even if the Python
+  env is broken or the package can't be imported. `peon-pet --uninstall` just
+  `exec`s that script. The script removes the XDG files, runs
+  `uv tool uninstall peon-pet`, and self-deletes at the end. The flag is a thin
+  shell forward, not Python logic — uninstall steps live in one shell script.
 
 **Update.** `peon-pet --update` — curls the latest `install.sh` and pipes it to
   `sh`, same as the web install one-liner. `install.sh` detects an already
@@ -52,9 +56,10 @@ The `.desktop` and icon get bundled via `force-include` (the asset case that
   a local wheel, but the check is cheap and the message is clearer than a later
   `command not found`).
 - `uv` — needed to install the wheel into an isolated env.
-- `python3` — `uv` can bootstrap its own Python, but the entry-point shim and
-  `importlib.resources` access still need a Python on PATH; `uv tool install`
-  also benefits from a system Python.
+- `python3` (or `python` / `py` fallback) — `uv` can fetch its own Python
+  (`uv tool install --python 3.12`), so a missing system Python isn't fatal;
+  the preflight just warns and lets `uv` resolve one. Hard fail only if neither
+  `uv` nor a system Python is usable.
 
 Missing `uv` is the common case on a fresh box — the message should suggest the
   one-liner from the uv docs (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
