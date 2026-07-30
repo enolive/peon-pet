@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Peon Pet
+Comment=Desktop pet that reacts to peon-ping events
+Exec=peon-pet --watch
+Icon=peon-pet
+Terminal=false
+Categories=Utility;Amusement;
+Keywords=pet;peon;ping;companion;

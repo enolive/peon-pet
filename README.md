@@ -27,11 +27,11 @@ A friendly companion to [PeonPing](https://www.peonping.com/). Will read its sta
 ## Installation
 
 ```bash
-# builds the project
-uv build
-# installs the project to your local bin path
-uv tool install dist/*.whl
+./install.sh
 ```
+
+Builds the wheel, installs the `peon-pet` command via `uv tool`, and drops the
+desktop entry + icon so it shows up in your app menu.
 
 ## Usage
 

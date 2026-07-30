@@ -8,6 +8,7 @@ from enum import StrEnum
 from importlib.resources import files
 
 ASSETS = files(__package__) / "assets"
+ICONS = files(__package__) / "icons"
 
 
 class Anim(StrEnum):
