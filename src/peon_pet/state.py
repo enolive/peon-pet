@@ -41,8 +41,9 @@ class _SessionState(enum.Enum):
     ACTIVE = "active"
 
 
-# Events that start a session (→ added to the registry as IDLE). Only SessionStart;
-# working events below mark a session ACTIVE (and alive-if-new) instead.
+# Events that start a session (→ added to the registry as IDLE). Only
+# SessionStart; working events below mark a session ACTIVE (and alive-if-new)
+# instead.
 _SESSION_START_EVENTS: frozenset[str] = frozenset({"SessionStart"})
 
 # Events that flip a session's task to ACTIVE (→ TYPING). Also marks the
@@ -107,15 +108,26 @@ class _SessionRegistry:
             self._sessions[session_id] = (_SessionState.ACTIVE, time.time())
 
     def set_idle(self, session_id: str) -> None:
-        """Flip a session's task to IDLE (task done, session still alive)."""
+        """Flip a session's task to IDLE (task done, session still alive).
+
+        Registers the session if unknown: a cold-start replay of e.g. `Stop`
+        must still track the session (the watcher saw it), even though we play
+        `waking` instead of the reaction. Otherwise the session never lands in
+        the registry and the badge stays 0.
+        """
         with self._lock:
-            if session_id in self._sessions:
-                self._sessions[session_id] = (_SessionState.IDLE, time.time())
+            self._sessions[session_id] = (_SessionState.IDLE, time.time())
 
     def discard(self, session_id: str) -> None:
         """Remove a session (SessionEnd)."""
         with self._lock:
             self._sessions.pop(session_id, None)
+
+    def __contains__(self, session_id: str) -> bool:
+        """Whether a session is currently known. Used by the state machine to
+        detect a cold-start replay of a stale event."""
+        with self._lock:
+            return session_id in self._sessions
 
     @property
     def count(self) -> int:
@@ -160,10 +172,21 @@ class PetStateMachine:
         return Anim.TYPING if self._sessions.any_active else Anim.SLEEPING
 
     def handle_event(self, event: str, session_id: str) -> None:
-        """Process a peon-ping event, emitting the appropriate anim."""
+        """Process a peon-ping event, emitting the appropriate anim.
+
+        Cold-start special case: if the session is unknown, this event is a
+        replay of the last peon-ping event on startup (the watcher emits the
+        current state once on start). Replaying e.g. a stale `Stop` would
+        spuriously celebrate. Instead treat an unknown session like a fresh
+        `SessionStart` — play `waking` — but still apply the event's real state
+        transition, so the base anim is correct once waking finishes (typing for
+        a working event, sleeping for `Stop`).
+        """
         if event not in KNOWN_EVENTS:
             print(f"peon-pet: unknown peon-ping event {event!r}", file=sys.stderr)
             return
+
+        cold_start = session_id not in self._sessions
 
         # Update the single registry — liveness and task state together.
         if event in _SESSION_START_EVENTS:
@@ -175,7 +198,7 @@ class PetStateMachine:
         elif event in _SESSION_END_EVENTS:
             self._sessions.discard(session_id)
 
-        anim = self.resolve_anim(event)
+        anim = Anim.WAKING if cold_start else self.resolve_anim(event)
 
         # Emit outside the lock — the callback (a Qt signal emit) is non-blocking,
         # and not holding the lock means a callback that re-entered state wouldn't deadlock.

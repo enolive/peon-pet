@@ -65,6 +65,7 @@ Events use the OG peon-ping/Claude hook names (`SessionStart`, `Stop`, `UserProm
 - **Enums**: PyQt6 requires fully-qualified enum access (`Qt.WindowType.FramelessWindowHint`, not `Qt.FramelessWindowHint`). Don't use the short form — it doesn't exist at runtime.
 - **Overrides**: use `@typing.override` on methods that override QWidget base methods (e.g. `paintEvent`). Don't add it to our own methods like `advance`.
 - **Assets**: use `importlib.resources` (`files(__package__) / "assets"`) — never `__file__`-relative paths. The latter breaks after `pip install`.
+- **File layout**: organize files top-down. The primary entry point / public function goes at the top; helpers and data classes go below it. Put `if __name__ == "__main__"` at the very bottom of the file, never between functions.
 
 ## Legacy reference
 

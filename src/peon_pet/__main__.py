@@ -21,51 +21,6 @@ from .watcher import DEFAULT_STATE_PATH, StateWatcher
 from .window import PetWindow
 
 
-@final
-class _Seam(QtCore.QObject):
-    """Marshals state-machine anim changes onto the GUI thread.
-
-    The state machine runs on the watcher's daemon thread (and is also touched
-    from the GUI thread via window.finished). Its only GUI-thread requirement is
-    that `win.play` runs on the GUI thread — so the seam sits at the state→window
-    boundary, not at watcher→state. Created on the GUI thread.
-    """
-
-    anim_changed = QtCore.pyqtSignal(Anim)
-    session_count_changed = QtCore.pyqtSignal(int)
-
-
-def _print_event_anim_mapping() -> None:
-    """Print the peon-ping event → anim mapping to stdout for reference."""
-    print("event → anim mapping:")
-    for event in EVENT_REACTION:
-        anim = EVENT_REACTION[event]
-        print(f"  {event:22s} → {anim.value}")
-    # SessionEnd has no transient reaction — it removes the session and settles
-    # to the base anim (SLEEPING if none remain, else TYPING).
-    print(f"  {'SessionEnd':22s} → (settle to base: sleeping / typing)")
-
-
-def _resolve_anim(arg: str) -> Anim:
-    """Resolve an anim name, or list available anims and exit."""
-    try:
-        return Anim(arg)
-    except ValueError:
-        print(f"anim not found: {arg!r}", file=sys.stderr)
-        print("available anims (--anim <name>):", file=sys.stderr)
-        for a in Anim:
-            print(f"  {a.value:9s} (row {ANIM_CONFIG[a].row})", file=sys.stderr)
-        sys.exit(1)
-
-
-@dataclass
-class CliArgs:
-    anim: str | None
-    demo: bool
-    watch: Path | None
-    list_events: bool
-
-
 def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         prog="peon-pet",
@@ -111,6 +66,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         sys.exit(1)
     app = QtWidgets.QApplication(sys.argv)
     app.setApplicationName("Peon Pet")
+    _claim_single_instance(app)
 
     try:
         win = PetWindow(prefs)
@@ -159,6 +115,73 @@ def main(argv: Sequence[str] | None = None) -> None:
         watcher.start()
 
     sys.exit(app.exec())
+
+
+@final
+class _Seam(QtCore.QObject):
+    """Marshals state-machine anim changes onto the GUI thread.
+
+    The state machine runs on the watcher's daemon thread (and is also touched
+    from the GUI thread via window.finished). Its only GUI-thread requirement is
+    that `win.play` runs on the GUI thread — so the seam sits at the state→window
+    boundary, not at watcher→state. Created on the GUI thread.
+    """
+
+    anim_changed = QtCore.pyqtSignal(Anim)
+    session_count_changed = QtCore.pyqtSignal(int)
+
+
+def _print_event_anim_mapping() -> None:
+    """Print the peon-ping event → anim mapping to stdout for reference."""
+    print("event → anim mapping:")
+    for event in EVENT_REACTION:
+        anim = EVENT_REACTION[event]
+        print(f"  {event:22s} → {anim.value}")
+    # SessionEnd has no transient reaction — it removes the session and settles
+    # to the base anim (SLEEPING if none remain, else TYPING).
+    print(f"  {'SessionEnd':22s} → (settle to base: sleeping / typing)")
+
+
+def _resolve_anim(arg: str) -> Anim:
+    """Resolve an anim name, or list available anims and exit."""
+    try:
+        return Anim(arg)
+    except ValueError:
+        print(f"anim not found: {arg!r}", file=sys.stderr)
+        print("available anims (--anim <name>):", file=sys.stderr)
+        for a in Anim:
+            print(f"  {a.value:9s} (row {ANIM_CONFIG[a].row})", file=sys.stderr)
+        sys.exit(1)
+
+
+def _claim_single_instance(app: QtWidgets.QApplication) -> None:
+    """Exit if another peon-pet is running; otherwise claim the instance slot.
+
+    Qt local server is the portable single-instance primitive: a second launch
+    connects to the first's socket and bails out. `removeServer` clears any stale
+    socket left by a crashed previous run before we listen. The server is
+    parented to `app` so it outlives this function call.
+    """
+    from PyQt6 import QtNetwork
+
+    socket = QtNetwork.QLocalSocket()
+    socket.connectToServer("peon-pet")
+    if socket.waitForConnected(100):
+        print("peon-pet is already running.", file=sys.stderr)
+        sys.exit(0)
+    socket.close()
+    QtNetwork.QLocalServer.removeServer("peon-pet")
+    if not QtNetwork.QLocalServer(app).listen("peon-pet"):
+        print("ERROR: could not start single-instance server", file=sys.stderr)
+        sys.exit(1)
+
+
+@dataclass
+class CliArgs:
+    anim: str | None
+    demo: bool
+    watch: Path | None
+    list_events: bool
 
 
 if __name__ == "__main__":
