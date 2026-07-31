@@ -16,8 +16,15 @@ A desktop pet that reacts to peon-ping events. Python + PyQt6.
 
 ### Test style
 
-- Use the **AAA pattern** (Arrange / Act / Assert) with a dedicated blank line between each section. Exception: a test so
-  simple it reads as a one-liner (e.g. `assert f(x) == y`).
+- Use the **AAA pattern** (Arrange / Act / Assert) with a dedicated blank line between each section. Exception: a test
+  so simple it reads as a one-liner (e.g. `assert f(x) == y`).
+- Name the subject under test `sut`.
+- Organize test files top-down: test functions first, helpers and driver classes at the bottom (same convention as
+  source).
+- When deliberately testing private/internal API (logic with no public entry point, e.g., mtime/timestamp suppression):
+  centralize the private access in a single driver class rather than scattering `w._method()` across every test.
+  Document *why* the internal API is tested in the driver's docstring — this makes the smell deliberate and reviewable
+  instead of pervasive.
 
 ## Tech stack
 
@@ -26,7 +33,8 @@ A desktop pet that reacts to peon-ping events. Python + PyQt6.
 - **hatchling** build backend; produces an installable wheel
 - **basedpyright** for type checking (also the LSP Zed uses)
 - **ruff** for pretty formatting here
-- **pytest** for tests (none yet)
+- **pytest** for tests
+- **coverage** for test coverage
 
 ## Common commands
 

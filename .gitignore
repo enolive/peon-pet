@@ -16,3 +16,4 @@ legacy/
 *.DS_Store
 # coverage info
 /.coverage
+/.idea/dataSources.xml
