@@ -14,6 +14,11 @@ A desktop pet that reacts to peon-ping events. Python + PyQt6.
   - something not tested yet
 - The point is to make good development practice a habit. Deviations from it should be a deliberate choice.
 
+### Test style
+
+- Use the **AAA pattern** (Arrange / Act / Assert) with a dedicated blank line between each section. Exception: a test so
+  simple it reads as a one-liner (e.g. `assert f(x) == y`).
+
 ## Tech stack
 
 - **Python ≥ 3.10** with **PyQt6** for the GUI (frameless transparent always-on-top window)

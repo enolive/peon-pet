@@ -14,3 +14,5 @@ __pycache__/
 legacy/
 
 *.DS_Store
+# coverage info
+/.coverage
