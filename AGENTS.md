@@ -19,8 +19,12 @@ A desktop pet that reacts to peon-ping events. Python + PyQt6.
 - Use the **AAA pattern** (Arrange / Act / Assert) with a dedicated blank line between each section. Exception: a test
   so simple it reads as a one-liner (e.g. `assert f(x) == y`).
 - Name the subject under test `sut`.
-- Organize test files top-down: test functions first, helpers and driver classes at the bottom (same convention as
-  source).
+- Group related tests in `Test*` classes (PascalCase, no underscores — e.g. `TestColdStart`, `TestPollSuppression`).
+  Run one group with `pytest file.py::TestGroupName`. Keep stateless helpers as `_`-prefixed module functions and
+  stateful drivers as classes at the bottom of the file.
+- Organize test files top-down: test classes first, helpers and driver classes at the bottom (same convention as
+  source). Within the tests, lead with the highest-value/most-complex behavior and put trivial checks last — mirrors the
+  source rule of "primary entry point up top, helpers below".
 - When deliberately testing private/internal API (logic with no public entry point, e.g., mtime/timestamp suppression):
   centralize the private access in a single driver class rather than scattering `w._method()` across every test.
   Document *why* the internal API is tested in the driver's docstring — this makes the smell deliberate and reviewable

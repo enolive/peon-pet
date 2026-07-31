@@ -8,117 +8,114 @@ from peon_pet.state import Event
 from peon_pet.watcher import StateWatcher
 
 
-def test_emits_typed_event_for_known_name(tmp_path: Path) -> None:
-    state_path = tmp_path / ".state.json"
-    _write_state_to_file(state_path, "SessionStart", "s1", 1.0)
-    sut = WatcherDriver(state_path)
+class TestReadBoundary:
+    def test_emits_typed_event_for_known_name(self, tmp_path: Path) -> None:
+        state_path = tmp_path / ".state.json"
+        _write_state_to_file(state_path, "SessionStart", "s1", 1.0)
+        sut = WatcherDriver(state_path)
 
-    sut.emit_current()
+        sut.emit_current()
 
-    assert sut.seen == [(Event.SESSION_START, "s1")]
+        assert sut.seen == [(Event.SESSION_START, "s1")]
 
+    def test_unknown_event_name_is_skipped(self, tmp_path: Path) -> None:
+        state_path = tmp_path / ".state.json"
+        _write_state_to_file(state_path, "NotARealEvent", "s1", 1.0)
+        sut = WatcherDriver(state_path)
 
-def test_unknown_event_name_is_skipped(tmp_path: Path) -> None:
-    state_path = tmp_path / ".state.json"
-    _write_state_to_file(state_path, "NotARealEvent", "s1", 1.0)
-    sut = WatcherDriver(state_path)
+        sut.emit_current()
 
-    sut.emit_current()
+        assert sut.seen == []
 
-    assert sut.seen == []
+    def test_missing_event_field_is_skipped(self, tmp_path: Path) -> None:
+        state_path = tmp_path / ".state.json"
+        _write_state_to_file(state_path, None, "s1", 1.0)
+        sut = WatcherDriver(state_path)
 
+        sut.emit_current()
 
-def test_missing_event_field_is_skipped(tmp_path: Path) -> None:
-    state_path = tmp_path / ".state.json"
-    _write_state_to_file(state_path, None, "s1", 1.0)
-    sut = WatcherDriver(state_path)
+        assert sut.seen == []
 
-    sut.emit_current()
+    def test_emit_current_on_missing_file_does_not_crash(self, tmp_path: Path) -> None:
+        state_path = tmp_path / ".state.json"
+        sut = WatcherDriver(state_path)
 
-    assert sut.seen == []
+        sut.emit_current()
 
-
-def test_poll_does_not_reemit_when_mtime_unchanged(tmp_path: Path) -> None:
-    state_path = tmp_path / ".state.json"
-    _write_state_to_file(state_path, "SessionStart", "s1", 1.0)
-    sut = WatcherDriver(state_path)
-    sut.emit_current()
-    assert sut.seen == [(Event.SESSION_START, "s1")]
-    sut.seen.clear()
-
-    sut.poll()
-
-    assert sut.seen == []
+        assert sut.seen == []
 
 
-def test_poll_suppresses_when_mtime_changed_but_timestamp_equal(tmp_path: Path) -> None:
-    state_path = tmp_path / ".state.json"
-    _write_state_to_file(state_path, "SessionStart", "s1", 1.0)
-    _set_mtime(state_path, 1000.0)
-    sut = WatcherDriver(state_path)
-    sut.emit_current()
-    assert sut.seen == [(Event.SESSION_START, "s1")]
-    sut.seen.clear()
-    _write_state_to_file(state_path, "SessionStart", "s1", 1.0)
-    _set_mtime(state_path, 2000.0)
+class TestPollSuppression:
+    def test_does_not_reemit_when_mtime_unchanged(self, tmp_path: Path) -> None:
+        state_path = tmp_path / ".state.json"
+        _write_state_to_file(state_path, "SessionStart", "s1", 1.0)
+        sut = WatcherDriver(state_path)
+        sut.emit_current()
+        assert sut.seen == [(Event.SESSION_START, "s1")]
+        sut.seen.clear()
 
-    sut.poll()
+        sut.poll()
 
-    assert sut.seen == []
+        assert sut.seen == []
 
+    def test_suppresses_when_mtime_changed_but_timestamp_equal(
+        self, tmp_path: Path
+    ) -> None:
+        state_path = tmp_path / ".state.json"
+        _write_state_to_file(state_path, "SessionStart", "s1", 1.0)
+        _set_mtime(state_path, 1000.0)
+        sut = WatcherDriver(state_path)
+        sut.emit_current()
+        assert sut.seen == [(Event.SESSION_START, "s1")]
+        sut.seen.clear()
+        _write_state_to_file(state_path, "SessionStart", "s1", 1.0)
+        _set_mtime(state_path, 2000.0)
 
-def test_poll_emits_when_mtime_and_timestamp_newer(tmp_path: Path) -> None:
-    state_path = tmp_path / ".state.json"
-    _write_state_to_file(state_path, "SessionStart", "s1", 1.0)
-    _set_mtime(state_path, 1000.0)
-    sut = WatcherDriver(state_path)
-    sut.emit_current()
-    assert sut.seen == [(Event.SESSION_START, "s1")]
-    sut.seen.clear()
-    _write_state_to_file(state_path, "UserPromptSubmit", "s1", 2.0)
-    _set_mtime(state_path, 2000.0)
+        sut.poll()
 
-    sut.poll()
+        assert sut.seen == []
 
-    assert sut.seen == [(Event.USER_PROMPT_SUBMIT, "s1")]
+    def test_emits_when_mtime_and_timestamp_newer(self, tmp_path: Path) -> None:
+        state_path = tmp_path / ".state.json"
+        _write_state_to_file(state_path, "SessionStart", "s1", 1.0)
+        _set_mtime(state_path, 1000.0)
+        sut = WatcherDriver(state_path)
+        sut.emit_current()
+        assert sut.seen == [(Event.SESSION_START, "s1")]
+        sut.seen.clear()
+        _write_state_to_file(state_path, "UserPromptSubmit", "s1", 2.0)
+        _set_mtime(state_path, 2000.0)
 
+        sut.poll()
 
-def test_poll_skips_malformed_json_without_crash(tmp_path: Path) -> None:
-    state_path = tmp_path / ".state.json"
-    _write_state_to_file(state_path, "SessionStart", "s1", 1.0)
-    _set_mtime(state_path, 1000.0)
-    sut = WatcherDriver(state_path)
-    sut.emit_current()
-    sut.seen.clear()
-    state_path.write_text("{not json")
-    _set_mtime(state_path, 2000.0)
+        assert sut.seen == [(Event.USER_PROMPT_SUBMIT, "s1")]
 
-    sut.poll()
+    def test_skips_malformed_json_without_crash(self, tmp_path: Path) -> None:
+        state_path = tmp_path / ".state.json"
+        _write_state_to_file(state_path, "SessionStart", "s1", 1.0)
+        _set_mtime(state_path, 1000.0)
+        sut = WatcherDriver(state_path)
+        sut.emit_current()
+        sut.seen.clear()
+        state_path.write_text("{not json")
+        _set_mtime(state_path, 2000.0)
 
-    assert sut.seen == []
+        sut.poll()
 
+        assert sut.seen == []
 
-def test_poll_skips_missing_file_without_crash(tmp_path: Path) -> None:
-    state_path = tmp_path / ".state.json"
-    _write_state_to_file(state_path, "SessionStart", "s1", 1.0)
-    _set_mtime(state_path, 1000.0)
-    sut = WatcherDriver(state_path)
-    sut.emit_current()
-    sut.seen.clear()
-    state_path.unlink()
+    def test_skips_missing_file_without_crash(self, tmp_path: Path) -> None:
+        state_path = tmp_path / ".state.json"
+        _write_state_to_file(state_path, "SessionStart", "s1", 1.0)
+        _set_mtime(state_path, 1000.0)
+        sut = WatcherDriver(state_path)
+        sut.emit_current()
+        sut.seen.clear()
+        state_path.unlink()
 
-    sut.poll()
+        sut.poll()
 
-    assert sut.seen == []
-
-
-def test_emit_current_on_missing_file_does_not_crash(tmp_path: Path) -> None:
-    state_path = tmp_path / ".state.json"
-    sut = WatcherDriver(state_path)
-
-    sut.emit_current()
-
-    assert sut.seen == []
+        assert sut.seen == []
 
 
 def _write_state_to_file(path: Path, event: object, sid: object, ts: float) -> None:
@@ -160,8 +157,10 @@ class WatcherDriver:
 
     def emit_current(self) -> None:
         """Act: the watcher's initial sync (one `_emit_current`)."""
+        # noinspection protected-member
         self._watcher._emit_current()  # pyright: ignore[reportPrivateUsage]
 
     def poll(self) -> None:
         """Act: one polling tick (one `_poll`)."""
+        # noinspection protected-member
         self._watcher._poll()  # pyright: ignore[reportPrivateUsage]

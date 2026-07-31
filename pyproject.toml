@@ -23,5 +23,6 @@ dev = [
     "basedpyright>=1.39.9",
     "coverage>=7.15.2",
     "pytest>=8",
+    "pytest-qt>=4.4",
     "ruff>=0.16.0",
 ]

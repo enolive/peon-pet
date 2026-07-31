@@ -16,6 +16,25 @@ WIN_SIZE: int = 200
 SPRITE_SIZE: int = 180  # inset like the JS (PlaneGeometry 180 in a 200 win)
 
 
+def cell_rect(frame: int, row: int, cell_w: float, cell_h: float) -> QtCore.QRectF:
+    """Source rect of the sprite cell at `frame` (column), `row` in the atlas.
+
+    Pure math over the atlas grid — no Qt application needed to construct or
+    assert on the returned `QRectF` (a value type). Extracted from `paintEvent`
+    so the "which sprite" math is testable without rendering.
+    """
+    return QtCore.QRectF(frame * cell_w, row * cell_h, cell_w, cell_h)
+
+
+def missing_anims(rows: int) -> list[Anim]:
+    """Anims whose configured row is at or beyond `rows` (→ fall back to row 0).
+
+    Pure given the atlas row count. The stderr warning stays in
+    `_warn_missing_anims`; this is the testable core.
+    """
+    return [a for a in Anim if ANIM_CONFIG[a].row >= rows]
+
+
 @final
 class PetWindow(QtWidgets.QWidget):
     # Class-level type declarations (assigned in __init__).
@@ -127,7 +146,7 @@ class PetWindow(QtWidgets.QWidget):
 
     def _warn_missing_anims(self, atlas: str) -> None:
         """Warn once at startup about anims the atlas can't render (too few rows)."""
-        missing = [a for a in Anim if ANIM_CONFIG[a].row >= self._rows]
+        missing = missing_anims(self._rows)
         if not missing:
             return
         names = ", ".join(f"{a.value} (row {ANIM_CONFIG[a].row})" for a in missing)
@@ -204,9 +223,7 @@ class PetWindow(QtWidgets.QWidget):
         # Sprite: current cell of the atlas, scaled to SPRITE_SIZE, centered
         sx = (WIN_SIZE - SPRITE_SIZE) // 2
         sy = (WIN_SIZE - SPRITE_SIZE) // 2
-        src = QtCore.QRectF(
-            self.frame * self.cell_w, self.row * self.cell_h, self.cell_w, self.cell_h
-        )
+        src = cell_rect(self.frame, self.row, self.cell_w, self.cell_h)
         p.drawPixmap(QtCore.QRectF(sx, sy, SPRITE_SIZE, SPRITE_SIZE), self.atlas, src)
 
         # Border: full atlas border image stretched to the window (if configured)
