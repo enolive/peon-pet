@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-import sys
+import logging
 from typing import final, override
 
 from PyQt6 import QtCore, QtGui, QtWidgets
 
 from .config import ANIM_CONFIG, ASSETS, ATLAS_LAYOUTS, Anim
 from .prefs import Prefs
+
+logger = logging.getLogger(__name__)
 
 WIN_SIZE: int = 200
 SPRITE_SIZE: int = 180  # inset like the JS (PlaneGeometry 180 in a 200 win)
@@ -129,12 +131,13 @@ class PetWindow(QtWidgets.QWidget):
         if not missing:
             return
         names = ", ".join(f"{a.value} (row {ANIM_CONFIG[a].row})" for a in missing)
-        msg = (
-            f"peon-pet: atlas {atlas!r} has {self._rows} row(s); "
-            f"{len(missing)} anim(s) have no sprite and will fall back to row 0: "
-            f"{names}"
+        logger.warning(
+            "atlas %r has %d row(s); %d anim(s) have no sprite and will fall back to row 0: %s",
+            atlas,
+            self._rows,
+            len(missing),
+            names,
         )
-        print(msg, file=sys.stderr)
 
     def advance(self) -> None:
         self.frame += 1

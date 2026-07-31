@@ -3,16 +3,21 @@
 from __future__ import annotations
 
 import json
+import logging
 import threading
 from collections.abc import Callable
 from pathlib import Path
 from typing import final
 
+from .state import Event
+
 DEFAULT_STATE_PATH = Path.home() / ".claude" / "hooks" / "peon-ping" / ".state.json"
 POLL_INTERVAL_S = 0.5
 
-# Callback shape: (event_name, session_id).
-OnEvent = Callable[[str, str], None]
+logger = logging.getLogger(__name__)
+
+# Callback shape: (event, session_id).
+OnEvent = Callable[[Event, str], None]
 
 
 @final
@@ -43,28 +48,24 @@ class StateWatcher:
         self._stop.clear()
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
+        logger.debug("started, polling %s", self.path)
 
     def stop(self) -> None:
         self._stop.set()
+        logger.debug("stop requested")
 
     def _run(self) -> None:
+        logger.debug("polling thread running")
         self._emit_current()
         while not self._stop.wait(POLL_INTERVAL_S):
             self._poll()
+        logger.debug("polling thread exiting")
 
     def _emit_current(self) -> None:
         """Emit the current event and record its timestamp so the next poll
         doesn't re-emit it."""
         self._last_mtime = self._mtime()
-        last_active = self._read_last_active()
-        if last_active is None:
-            return
-        self._last_timestamp = self._ts(last_active)
-        ev = _field(last_active, "event")
-        sid = _field(last_active, "session_id")
-        if ev is None or sid is None:
-            return
-        self.on_event(ev, sid)
+        self._emit(self._read_last_active())
 
     def _poll(self) -> None:
         mtime = self._mtime()
@@ -76,11 +77,30 @@ class StateWatcher:
             return
         ts = self._ts(last_active)
         if ts <= self._last_timestamp:
+            logger.debug("mtime changed but timestamp not newer (%.3f)", ts)
             return
         self._last_timestamp = ts
-        ev = _field(last_active, "event")
+        self._emit(last_active)
+
+    def _emit(self, last_active: dict[str, object] | None) -> None:
+        """Parse last_active into an (Event, session_id) pair and invoke on_event.
+
+        Called from both `_emit_current` and `_poll`. Updates `_last_timestamp`
+        so the next poll doesn't re-emit an older event. Unknown event names or
+        missing fields are skipped (the read boundary — the only place str→Event
+        parsing happens)."""
+        if last_active is None:
+            return
+        self._last_timestamp = self._ts(last_active)
+        ev_name = _field(last_active, "event")
         sid = _field(last_active, "session_id")
-        if ev is None or sid is None:
+        if ev_name is None:
+            return
+        ev = Event.from_name(ev_name)
+        if ev is None:
+            logger.warning("unknown peon-ping event %r", ev_name)
+            return
+        if sid is None:
             return
         self.on_event(ev, sid)
 
@@ -113,5 +133,5 @@ def _field(last_active: dict[str, object], key: str) -> str | None:
     return v if isinstance(v, str) else None
 
 
-def _noop(_event: str, _session_id: str) -> None:
+def _noop(_event: Event, _session_id: str) -> None:
     pass

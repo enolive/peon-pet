@@ -25,13 +25,16 @@ the pet sleeps (task done) even while the session is still open — the badge
 from __future__ import annotations
 
 import enum
-import sys
+import logging
 import threading
 import time
 from collections.abc import Callable
+from enum import StrEnum
 from typing import final
 
 from .config import Anim
+
+logger = logging.getLogger(__name__)
 
 
 class _SessionState(enum.Enum):
@@ -41,44 +44,71 @@ class _SessionState(enum.Enum):
     ACTIVE = "active"
 
 
+class Event(StrEnum):
+    """Peon-ping hook events (the OG names) that the pet reacts to.
+
+    Parsed from the `event` field of `.state.json`'s `last_active` at the read
+    boundary (watcher); the state machine only ever sees typed `Event`s.
+    `SessionEnd` is the only event without a transient reaction anim.
+    """
+
+    SESSION_START = "SessionStart"
+    USER_PROMPT_SUBMIT = "UserPromptSubmit"
+    PRE_TOOL_USE = "PreToolUse"
+    POST_TOOL_USE = "PostToolUse"
+    POST_TOOL_USE_FAILURE = "PostToolUseFailure"
+    PERMISSION_REQUEST = "PermissionRequest"
+    PRE_COMPACT = "PreCompact"
+    STOP = "Stop"
+    SESSION_END = "SessionEnd"
+
+    @staticmethod
+    def from_name(name: str) -> Event | None:
+        """Parse a peon-ping event name, or None if unknown."""
+        try:
+            return Event(name)
+        except ValueError:
+            return None
+
+
 # Events that start a session (→ added to the registry as IDLE). Only
 # SessionStart; working events below mark a session ACTIVE (and alive-if-new)
 # instead.
-_SESSION_START_EVENTS: frozenset[str] = frozenset({"SessionStart"})
+_SESSION_START_EVENTS: frozenset[Event] = frozenset({Event.SESSION_START})
 
 # Events that flip a session's task to ACTIVE (→ TYPING). Also marks the
 # session alive if new, so a cold start mid-session recovers on the next
 # tool use instead of waiting for a SessionStart we already missed.
-_TASK_ACTIVE_EVENTS: frozenset[str] = frozenset(
+_TASK_ACTIVE_EVENTS: frozenset[Event] = frozenset(
     {
-        "UserPromptSubmit",
-        "PreToolUse",
-        "PostToolUse",
+        Event.USER_PROMPT_SUBMIT,
+        Event.PRE_TOOL_USE,
+        Event.POST_TOOL_USE,
     }
 )
 
 # Events that flip a session's task to IDLE (→ SLEEPING). Stop completes the
 # current task but does not end the session.
-_TASK_IDLE_EVENTS: frozenset[str] = frozenset({"Stop"})
+_TASK_IDLE_EVENTS: frozenset[Event] = frozenset({Event.STOP})
 
 # Events that end a session (→ removed from registry). Only SessionEnd.
-_SESSION_END_EVENTS: frozenset[str] = frozenset({"SessionEnd"})
+_SESSION_END_EVENTS: frozenset[Event] = frozenset({Event.SESSION_END})
 
 # Peon-ping event → transient reaction anim. Events without an entry (only
 # SessionEnd) have no reaction and just settle to the base anim.
-EVENT_REACTION: dict[str, Anim] = {
-    "SessionStart": Anim.WAKING,
-    "UserPromptSubmit": Anim.TYPING,
-    "PreToolUse": Anim.TYPING,
-    "PermissionRequest": Anim.ALARMED,
-    "PostToolUse": Anim.TYPING,
-    "PostToolUseFailure": Anim.ANNOYED,
-    "PreCompact": Anim.ALARMED,
-    "Stop": Anim.CELEBRATE,
+EVENT_REACTION: dict[Event, Anim] = {
+    Event.SESSION_START: Anim.WAKING,
+    Event.USER_PROMPT_SUBMIT: Anim.TYPING,
+    Event.PRE_TOOL_USE: Anim.TYPING,
+    Event.PERMISSION_REQUEST: Anim.ALARMED,
+    Event.POST_TOOL_USE: Anim.TYPING,
+    Event.POST_TOOL_USE_FAILURE: Anim.ANNOYED,
+    Event.PRE_COMPACT: Anim.ALARMED,
+    Event.STOP: Anim.CELEBRATE,
 }
 
 # Every event peon-pet understands (for validation / --help listing).
-KNOWN_EVENTS: frozenset[str] = frozenset(EVENT_REACTION) | _SESSION_END_EVENTS
+KNOWN_EVENTS: frozenset[Event] = frozenset(EVENT_REACTION) | _SESSION_END_EVENTS
 
 
 @final
@@ -170,7 +200,7 @@ class PetStateMachine:
     def base_anim(self) -> Anim:
         return Anim.TYPING if self._sessions.any_active else Anim.SLEEPING
 
-    def handle_event(self, event: str, session_id: str) -> None:
+    def handle_event(self, event: Event, session_id: str) -> None:
         """Process a peon-ping event, emitting the appropriate anim.
 
         Cold start
@@ -195,10 +225,6 @@ class PetStateMachine:
         no `SessionEnd` reaction and settles to the base anim (sleeping). Live
         events for already-tracked sessions keep their normal reaction.
         """
-        if event not in KNOWN_EVENTS:
-            print(f"peon-pet: unknown peon-ping event {event!r}", file=sys.stderr)
-            return
-
         cold_start = session_id not in self._sessions
 
         # Update the single registry — liveness and task state together.
@@ -217,10 +243,19 @@ class PetStateMachine:
         else:
             anim = self.resolve_anim(event)
 
+        logger.debug(
+            "event=%s sid=%s cold=%s → anim=%s count=%d",
+            event,
+            session_id,
+            cold_start,
+            anim,
+            self._sessions.count,
+        )
+
         self.on_anim_changed(anim)
         self.on_session_count_changed(self._sessions.count)
 
-    def resolve_anim(self, event: str) -> Anim:
+    def resolve_anim(self, event: Event) -> Anim:
         """
         Transforms the given event into an animation.
         Falls back to base anim which depends on the overall session state.

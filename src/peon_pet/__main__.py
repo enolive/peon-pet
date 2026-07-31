@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import signal
 import sys
 from collections.abc import Sequence
@@ -15,10 +16,12 @@ from PyQt6 import QtCore, QtWidgets
 from .config import ANIM_CONFIG, Anim
 from .demo import Demo
 from .prefs import Prefs
-from .state import EVENT_REACTION, PetStateMachine
+from .state import EVENT_REACTION, Event, PetStateMachine
 from .tray import TrayIcon
 from .watcher import DEFAULT_STATE_PATH, StateWatcher
 from .window import PetWindow
+
+logger = logging.getLogger(__name__)
 
 
 def main(argv: Sequence[str] | None = None) -> None:
@@ -27,6 +30,13 @@ def main(argv: Sequence[str] | None = None) -> None:
         description="Desktop pet that reacts to peon-ping events.",
     )
     parser.add_argument("--anim", default=None, help="anim to play on startup")
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="count",
+        default=0,
+        help="increase log verbosity (-v info, -vv debug)",
+    )
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument(
         "--demo",
@@ -53,7 +63,15 @@ def main(argv: Sequence[str] | None = None) -> None:
         demo=bool(ns.demo),
         watch=Path(ns.watch) if ns.watch is not None else None,
         list_events=bool(ns.list_events),
+        verbose=int(ns.verbose),
     )
+
+    logging.basicConfig(
+        level=_log_level(args.verbose),
+        format="%(levelname)s %(name)s: %(message)s",
+        stream=sys.stderr,
+    )
+    logger.debug("args=%s", args)
 
     if args.list_events:
         _print_event_anim_mapping()
@@ -92,6 +110,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     state = PetStateMachine()
 
     if args.demo:
+        logger.info("demo mode")
         # we need to marshal state events onto the GUI thread.
         seam = _Seam()
         seam.anim_changed.connect(lambda a: win.play(a, True))
@@ -100,8 +119,10 @@ def main(argv: Sequence[str] | None = None) -> None:
         demo.start()
     elif args.anim:
         anim = _resolve_anim(args.anim)
+        logger.info("playing %s on startup", anim.value)
         win.play(anim, True)
     elif args.watch:
+        logger.info("watching %s", args.watch)
         # we need to marshal state events onto the GUI thread.
         seam = _Seam()
         state.on_anim_changed = seam.anim_changed.emit
@@ -139,7 +160,7 @@ def _print_event_anim_mapping() -> None:
         print(f"  {event:22s} → {anim.value}")
     # SessionEnd has no transient reaction — it removes the session and settles
     # to the base anim (SLEEPING if none remain, else TYPING).
-    print(f"  {'SessionEnd':22s} → (settle to base: sleeping / typing)")
+    print(f"  {Event.SESSION_END.value:22s} → (settle to base: sleeping / typing)")
 
 
 def _resolve_anim(arg: str) -> Anim:
@@ -176,12 +197,21 @@ def _claim_single_instance(app: QtWidgets.QApplication) -> None:
         sys.exit(1)
 
 
+_LOG_LEVELS: tuple[int, int, int] = (logging.WARNING, logging.INFO, logging.DEBUG)
+
+
+def _log_level(verbosity: int) -> int:
+    """Map a -v count to a logging level, clamped to DEBUG."""
+    return _LOG_LEVELS[min(verbosity, len(_LOG_LEVELS) - 1)]
+
+
 @dataclass
 class CliArgs:
     anim: str | None
     demo: bool
     watch: Path | None
     list_events: bool
+    verbose: int
 
 
 if __name__ == "__main__":
