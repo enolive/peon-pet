@@ -54,7 +54,7 @@ Before passing a result to the user, run the following commands first in this or
 
 ```bash
 uv run ruff format .        # pretty formatting
-uv run basedpyright         # type-check (Zed uses the same tool/LSP)
+LC_ALL=C uv run basedpyright # type-check (Zed uses the same tool/LSP); LC_ALL=C forces English output
 uv run pytest               # run tests
 ```
 

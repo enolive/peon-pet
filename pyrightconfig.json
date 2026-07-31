@@ -2,7 +2,8 @@
   "venvPath": ".",
   "venv": ".venv",
   "include": [
-    "src"
+    "src",
+    "tests"
   ],
   "reportUnknownMemberType": "none",
   "reportUnknownArgumentType": "none",
