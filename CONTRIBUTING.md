@@ -37,4 +37,6 @@ Please keep changes focused and include tests or docs when behavior changes.
 * Keep implementation in `src/`, tests in `tests/`.
 * Edit `README.md` if necessary.
 * See `AGENTS.md` for detailed repository conventions.
+* See `docs/ARCHITECTURE.md` for the architecture and design decisions.
+* See `docs/ROADMAP.md` for the project roadmap.
 * I am pretty good at identifying AI slop 😁.

@@ -29,7 +29,7 @@ file and drives the state machine. The state machine is pure Python (no Qt); it 
 
 ## Modules
 
-`src/peon_pet/`, top-down by dependency:
+`../src/peon_pet`, top-down by dependency:
 
 | Module        | Role                                                                                                                   | Qt? |
 |---------------|------------------------------------------------------------------------------------------------------------------------|-----|
@@ -89,17 +89,17 @@ with each other or a real instance.
 
 ## Tests
 
-`tests/` mirrors `src/` one file per module, plus integration:
+`../tests` mirrors `../src` one file per module, plus integration:
 
 - **Unit tests** – the core of the coverage
 - **Integration tests** (`test_main_integration.py`) — `run(app, [...])`
   end-to-end
 
-See `AGENTS.md` for the test style (AAA, `sut`, `Test*` classes, driver classes for internal-API testing).
+See `../AGENTS.md` for the test style (AAA, `sut`, `Test*` classes, driver classes for internal-API testing).
 
 ## CI
 
-`.github/workflows/ci.yml` runs two parallel jobs on every push/PR to `main`:
+`../.github/workflows/ci.yml` runs two parallel jobs on every push/PR to `main`:
 
 - **`check`** – runs format checks and static analysis.
 - **`test`** — executes the tests and reports coverage.

@@ -109,4 +109,5 @@ version-controlled.
 
 ## References
 
-- `ARCHITECTURE.md` for the overall architecture and design decisions.
+- `docs/ARCHITECTURE.md` for the overall architecture and design decisions.
+- `docs/ROADMAP.md` for the project roadmap.
