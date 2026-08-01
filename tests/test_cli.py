@@ -1,15 +1,16 @@
 """Tests for cli.py: arg parsing, anim resolution, event mapping, and the
-log-level mapping. cli.py is pure Python (no Qt).
+log-level enum. cli.py is pure Python (no Qt).
 """
 
 import logging
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 
 from peon_pet.cli import (
     CliArgs,
-    log_level,
+    LogLevel,
     parse_args,
     print_event_anim_mapping,
     resolve_anim,
@@ -23,7 +24,11 @@ class TestParseArgs:
         args = parse_args([])
 
         assert args == CliArgs(
-            anim=None, demo=False, watch=None, list_events=False, verbose=0
+            anim=None,
+            demo=False,
+            watch=None,
+            list_events=False,
+            log_level=LogLevel.WARNING,
         )
 
     def test_anim_name_is_parsed(self) -> None:
@@ -31,10 +36,25 @@ class TestParseArgs:
 
         assert args.anim == "waking"
 
-    def test_verbose_count_accumulates(self) -> None:
-        args = parse_args(["-v", "-v"])
+    _EXPECTED_LOG_LEVELS: ClassVar[list[tuple[str, LogLevel]]] = [
+        ("--verbose", LogLevel.INFO),
+        ("-v", LogLevel.INFO),
+        ("-vv", LogLevel.DEBUG),
+        ("-vvv", LogLevel.DEBUG),
+        ("-vvvv", LogLevel.DEBUG),
+    ]
 
-        assert args.verbose == 2
+    @pytest.mark.parametrize(
+        "arg,expected",
+        argvalues=_EXPECTED_LOG_LEVELS,
+        ids=[arg for arg, _ in _EXPECTED_LOG_LEVELS],
+    )
+    def test_verbose_maps_to_expected_log_level(
+        self, arg: str, expected: LogLevel
+    ) -> None:
+        args = parse_args([arg])
+
+        assert args.log_level is expected
 
     def test_demo_flag_is_set(self) -> None:
         args = parse_args(["--demo"])
@@ -83,15 +103,11 @@ class TestPrintEventAnimMapping:
 
 
 class TestLogLevel:
-    def test_default_verbosity_is_warning(self) -> None:
-        assert log_level(0) == logging.WARNING
+    def test_warning_maps_to_stdlib_warning(self) -> None:
+        assert LogLevel.WARNING.to_stdlib() == logging.WARNING
 
-    def test_single_v_is_info(self) -> None:
-        assert log_level(1) == logging.INFO
+    def test_info_maps_to_stdlib_info(self) -> None:
+        assert LogLevel.INFO.to_stdlib() == logging.INFO
 
-    def test_double_v_is_debug(self) -> None:
-        assert log_level(2) == logging.DEBUG
-
-    def test_verbosity_clamps_to_debug_past_two(self) -> None:
-        assert log_level(3) == logging.DEBUG
-        assert log_level(99) == logging.DEBUG
+    def test_debug_maps_to_stdlib_debug(self) -> None:
+        assert LogLevel.DEBUG.to_stdlib() == logging.DEBUG

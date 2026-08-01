@@ -9,15 +9,17 @@ drive the event loop themselves instead of fighting a blocking `app.exec()`.
 from __future__ import annotations
 
 import logging
+import os
 import signal
 import sys
 from collections.abc import Sequence
+from pathlib import Path
 from typing import final
 
 from PyQt6 import QtCore, QtWidgets
 
 from .cli import (
-    log_level,
+    LogLevel,
     parse_args,
     print_event_anim_mapping,
     resolve_anim,
@@ -72,10 +74,25 @@ def run(
     args = parse_args(argv)
 
     logging.basicConfig(
-        level=log_level(args.verbose),
+        level=args.log_level.to_stdlib(),
         format="%(levelname)s %(name)s: %(message)s",
         stream=sys.stderr,
     )
+    # At DEBUG (-vv), also log to a file for post-hoc analysis of intermittent
+    # glitches. XDG state dir; append across runs to keep history.
+    if args.log_level is LogLevel.DEBUG:
+        xdg_state = os.environ.get("XDG_STATE_HOME") or str(
+            Path.home() / ".local" / "state"
+        )
+        log_path = Path(xdg_state) / "peon-pet" / "peon-pet-debug.log"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        file_handler = logging.FileHandler(log_path, mode="a", encoding="utf-8")
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(
+            logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+        )
+        logging.getLogger().addHandler(file_handler)
+        logger.info("logging to %s", log_path)
     logger.debug("args=%s", args)
 
     if args.list_events:

@@ -122,6 +122,7 @@ class PetWindow(QtWidgets.QWidget):
         alarmed, etc.) play `loops` times then emit `finished`; the caller
         (state machine) decides what follows. Never self-switches.
         """
+        logger.debug("play %s%s", anim.value, " (forever)" if play_forever else "")
         self.anim = anim
         cfg = ANIM_CONFIG[anim]
         loop: bool
