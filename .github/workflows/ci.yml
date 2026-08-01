@@ -36,6 +36,9 @@ jobs:
       - name: format check
         run: uv run ruff format --check .
 
+      - name: lint
+        run: uv run ruff check .
+
       - name: type check
         # LC_ALL=C forces English output
         env:

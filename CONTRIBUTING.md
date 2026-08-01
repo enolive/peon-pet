@@ -14,6 +14,8 @@ quality.
 uv sync
 # format files
 uv run ruff format .
+# run ruff linter
+uv run ruff check .
 # type check project
 uv run basedpyright
 # run all tests
