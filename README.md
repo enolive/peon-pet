@@ -1,7 +1,5 @@
 # Peon Pet
 
-just a no-op to test PR integration
-
 ![2b sleeping](intro.png)
 
 A friendly companion to [PeonPing](https://www.peonping.com/). Will read its state and animate it in different manners.
