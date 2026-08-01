@@ -40,18 +40,24 @@ def parse_args(argv: Sequence[str] | None) -> CliArgs:
         description="Desktop pet that reacts to peon-ping events.",
     )
     parser.add_argument("--anim", default=None, help="anim to play on startup")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
+        "--demo",
+        action="store_true",
+        help="cycle through every animation every 3s (visual QA)",
+    )
+    mode.add_argument(
+        "--list-events",
+        default=False,
+        action="store_true",
+        help="list all known events and their mappings to anims and exit",
+    )
     parser.add_argument(
         "-v",
         "--verbose",
         action="count",
         default=0,
         help="increase log verbosity (-v info, -vv debug)",
-    )
-    mode = parser.add_mutually_exclusive_group()
-    mode.add_argument(
-        "--demo",
-        action="store_true",
-        help="cycle through every animation every 3s (visual QA)",
     )
     mode.add_argument(
         "--watch",
@@ -60,12 +66,6 @@ def parse_args(argv: Sequence[str] | None) -> CliArgs:
         default=None,
         metavar="PATH",
         help=f"watch peon-ping .state.json at PATH and react to events (default: {DEFAULT_STATE_PATH})",
-    )
-    mode.add_argument(
-        "--list-events",
-        default=False,
-        action="store_true",
-        help="list all known events and their mappings to anims and exit",
     )
     ns = parser.parse_args(argv)
     return CliArgs(

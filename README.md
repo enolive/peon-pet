@@ -40,6 +40,10 @@ your app menu.
 ```bash
 # starts the pet in the watch mode. Will read its state from `~/.claude/hooks/peon-ping/.state.json'
 peon-pet --watch
+# starts the pet in the watch mode with a custom state path
+peon-pet --watch path/to/.state.json
+# list all available options
+peon-pet --help
 ```
 
 ## Configuration

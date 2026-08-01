@@ -59,6 +59,7 @@ session announces `WAKING` (regardless of its own reaction) so a cold `Stop` doe
 
 ## The state watcher
 
+<!-- agnix-disable-next-line XP-003, false positive this describes the default watch path -->
 `StateWatcher` (`watcher.py`) polls `$HOME/.claude/hooks/peon-ping/.state.json` on a daemon thread. PeonPing writes
 atomically (tempfile + `os.replace`), which breaks `QFileSystemWatcher`'s inode watch, so we poll mtime instead. On a
 new mtime with a newer timestamp, it parses `last_active` into a typed `(Event,

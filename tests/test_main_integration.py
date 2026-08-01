@@ -139,7 +139,7 @@ class TestAnimIntegration:
 
 
 class TestListEvents:
-    def test_list_events(
+    def test_list_events_and_exits_immediately(
         self,
         app: QtWidgets.QApplication,
         single_instance_server_name: str,
