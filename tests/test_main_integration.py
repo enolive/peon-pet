@@ -1,25 +1,7 @@
 """Integration tests of the wired --watch chain: watcher → state → seam → window.
 
-These exercise the full `run(app, ["--watch", ...])` path end-to-end with
-offscreen Qt, no display, and no real peon-ping. `run` wires the app (window,
-watcher, tray) for the parsed args and returns the window — it receives the
-`QApplication` rather than constructing one, and does NOT call `app.exec()`, so
-the test owns the event loop.
-
-We drive it with `qtbot.waitUntil`, not `app.exec()` + `QTimer.singleShot`: the
-watcher runs a daemon thread that emits a GUI-bound Qt signal across threads,
-and `qtbot.waitUntil` pumps the event loop (via `processEvents`) until the
-queued `win.play` lands and `win.anim` flips. This reads top-to-bottom as one
-write + one wait per step — no nested continuations. (The earlier segfault here
-was a lifetime bug — `seam`/`state`/`watcher` GC'd while the worker thread still
-emitted — now fixed by parenting them to the app; and the watcher is stopped on
-`app.aboutToQuit` so its thread doesn't leak into the next test.)
-
-`run`'s `poll_interval_s` is injected (default 0.5s in production) so the tests
-run fast and don't duplicate the interval knowledge. The single-instance
-collision is skipped via the injectable name. A private `app` fixture
-creates/destroys a `QApplication` per test so the watcher from one test can't
-leak into the next.
+These exercise the full `run(app, ...])` path end-to-end with
+offscreen Qt, no display, and no real peon-ping.
 """
 
 import json
@@ -32,6 +14,7 @@ from pytestqt.qtbot import QtBot
 
 from peon_pet.__main__ import run
 from peon_pet.config import Anim
+from peon_pet.window import PetWindow
 
 POLL_INTERVAL_SECONDS = 0.05
 TIMEOUT_MS = 5000
@@ -137,6 +120,39 @@ class TestAnimIntegration:
         qtbot.waitUntil(lambda: win.anim == Anim.ANNOYED, timeout=TIMEOUT_MS)
 
         assert win.anim == Anim.ANNOYED
+
+    def test_bad_anim_raises_error(
+        self,
+        app: QtWidgets.QApplication,
+        single_instance_server_name: str,
+    ) -> None:
+        with pytest.raises(ValueError):
+            run(
+                app,
+                ["--anim", "bogus"],
+                single_instance_name=single_instance_server_name,
+            )
+
+        assert PetWindow not in app.topLevelWidgets(), (
+            "application should close instantly"
+        )
+
+
+class TestListEvents:
+    def test_list_events(
+        self,
+        app: QtWidgets.QApplication,
+        single_instance_server_name: str,
+    ) -> None:
+        with pytest.raises(SystemExit) as exc:
+            run(
+                app, ["--list-events"], single_instance_name=single_instance_server_name
+            )
+
+        assert exc.value.code == 0
+        assert PetWindow not in app.topLevelWidgets(), (
+            "application should close instantly"
+        )
 
 
 class TestDemoIntegration:

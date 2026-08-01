@@ -42,16 +42,24 @@ def main(
     single_instance_name: str = "peon-pet",
     poll_interval_s: float = POLL_INTERVAL_S,
 ) -> None:
-    """Build the app and block on its event loop. The real entry point."""
-    app = QtWidgets.QApplication(sys.argv)
-    app.setApplicationName("Peon Pet")
-    _win = run(
-        app,
-        argv,
-        single_instance_name=single_instance_name,
-        poll_interval_s=poll_interval_s,
-    )
-    sys.exit(app.exec())
+    """
+    Build the app and block on its event loop. The real entry point.
+
+    Raised errors from run() are printed to stderr and exit(1) is called.
+    """
+    try:
+        app = QtWidgets.QApplication(sys.argv)
+        app.setApplicationName("Peon Pet")
+        _win = run(
+            app,
+            argv,
+            single_instance_name=single_instance_name,
+            poll_interval_s=poll_interval_s,
+        )
+        sys.exit(app.exec())
+    except (RuntimeError, ValueError) as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 def run(
@@ -66,8 +74,6 @@ def run(
     Receives the `QApplication` (created by `main`, or a per-test fixture) rather
     than constructing one, so tests can own the app's lifecycle and avoid two
     `QApplication`s coexisting. Does NOT call `app.exec()` — `main` does that.
-    Pre-loop failures (bad atlas, bad anim arg, list-events) still `sys.exit` here
-    since there's no app to return to.
     """
     args = parse_args(argv)
 
@@ -82,18 +88,10 @@ def run(
         print_event_anim_mapping()
         sys.exit(0)
 
-    try:
-        prefs = Prefs()
-    except ValueError as e:
-        print(f"ERROR: {e}", file=sys.stderr)
-        sys.exit(1)
+    prefs = Prefs()
     claim_single_instance(app, name=single_instance_name)
 
-    try:
-        win = PetWindow(prefs)
-    except RuntimeError as e:
-        print(f"ERROR: {e}", file=sys.stderr)
-        sys.exit(1)
+    win = PetWindow(prefs)
     win.show()
 
     tray = TrayIcon(app)
@@ -122,11 +120,7 @@ def run(
         app.setProperty("peon_pet_demo", demo)
         demo.start()
     elif args.anim:
-        try:
-            anim = resolve_anim(args.anim)
-        except ValueError as e:
-            print(f"ERROR: {e}", file=sys.stderr)
-            sys.exit(1)
+        anim = resolve_anim(args.anim)
         logger.info("playing %s on startup", anim.value)
         win.play(anim, True)
     elif args.watch:
