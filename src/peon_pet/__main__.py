@@ -117,8 +117,7 @@ def run(
         # we need to marshal state events onto the GUI thread.
         seam = _Seam(parent=app)
         seam.anim_changed.connect(lambda a: win.play(a, True))
-        demo = Demo(interval_s=poll_interval_s)
-        demo.on_anim_changed = seam.anim_changed.emit
+        demo = Demo(on_anim_changed=seam.anim_changed.emit, interval_s=poll_interval_s)
         # pattern as the watcher in the --watch branch.
         app.setProperty("peon_pet_demo", demo)
         demo.start()

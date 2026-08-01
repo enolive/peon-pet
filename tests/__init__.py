@@ -1,0 +1,1 @@
+"""tests for peon-pet"""

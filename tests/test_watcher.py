@@ -3,11 +3,11 @@
 import json
 import os
 import time
-from collections.abc import Callable
 from pathlib import Path
 
 from peon_pet.state import Event
 from peon_pet.watcher import StateWatcher
+from tests.assertions import wait_until
 
 
 class TestThread:
@@ -17,11 +17,11 @@ class TestThread:
         sut = WatcherDriver(path=state_path, poll_interval_s=0.05)
         try:
             sut.start()
-            assert _wait_until(lambda: sut.seen == [(Event.SESSION_START, "s1")])
+            assert wait_until(lambda: sut.seen == [(Event.SESSION_START, "s1")])
 
             _write_state_to_file(state_path, "UserPromptSubmit", "s1", 2.0)
 
-            assert _wait_until(
+            assert wait_until(
                 lambda: (
                     sut.seen
                     == [(Event.SESSION_START, "s1"), (Event.USER_PROMPT_SUBMIT, "s1")]
@@ -35,7 +35,7 @@ class TestThread:
         _write_state_to_file(state_path, "SessionStart", "s1", 1.0)
         sut = WatcherDriver(path=state_path, poll_interval_s=0.05)
         sut.start()
-        assert _wait_until(lambda: sut.seen == [(Event.SESSION_START, "s1")])
+        assert wait_until(lambda: sut.seen == [(Event.SESSION_START, "s1")])
 
         sut.stop()
         _write_state_to_file(state_path, "UserPromptSubmit", "s1", 2.0)
@@ -186,21 +186,6 @@ def _write_state_to_file(path: Path, event: object, sid: str | None, ts: float) 
 
 def _set_mtime(path: Path, mtime: float) -> None:
     os.utime(path, (mtime, mtime))
-
-
-def _wait_until(predicate: Callable[[], bool], *, timeout_s: float = 2.0) -> bool:
-    """Poll `predicate` every 5ms until it's true or `timeout_s` elapses.
-
-    No Qt here — `StateWatcher`'s thread runs independently of any event loop,
-    so a plain sleep-poll is the right primitive (and deterministic: returns as
-    soon as the condition holds rather than over-sleeping).
-    """
-    deadline = time.monotonic() + timeout_s
-    while time.monotonic() < deadline:
-        if predicate():
-            return True
-        time.sleep(0.005)
-    return predicate()
 
 
 class WatcherDriver:

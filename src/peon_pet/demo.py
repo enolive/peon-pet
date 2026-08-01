@@ -27,18 +27,21 @@ OnAnim = Callable[[Anim], None]
 class Demo:
     """Cycles through every Anim forever on a daemon thread."""
 
-    def __init__(self, interval_s: float = DEFAULT_INTERVAL_S) -> None:
+    def __init__(
+        self,
+        on_anim_changed: OnAnim,
+        interval_s: float = DEFAULT_INTERVAL_S,
+    ) -> None:
         self._interval = interval_s
         self._it = cycle(Anim)
         next(self._it)  # skip SLEEPING, which the window starts on
-        self.on_anim_changed: OnAnim = _noop
+        self.on_anim_changed = on_anim_changed
         self._stop = threading.Event()
-        self._thread: threading.Thread | None = None
 
     def start(self) -> None:
         self._stop.clear()
-        self._thread = threading.Thread(target=self._run, daemon=True)
-        self._thread.start()
+        thread = threading.Thread(target=self._run, daemon=True)
+        thread.start()
 
     def stop(self) -> None:
         self._stop.set()
@@ -52,7 +55,3 @@ class Demo:
 
     def _emit(self) -> None:
         self.on_anim_changed(next(self._it))
-
-
-def _noop(_anim: Anim) -> None:
-    pass
