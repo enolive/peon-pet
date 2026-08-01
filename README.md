@@ -43,7 +43,7 @@ peon-pet --watch
 
 ## Configuration
 
-Peon pet creates a `config.json` inside your config directory, usually `~./config/peon-pet`.
+Peon pet creates a `config.json` inside your config directory, usually `~/.config/peon-pet`.
 
 ```
 {

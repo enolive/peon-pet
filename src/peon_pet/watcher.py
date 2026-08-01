@@ -33,10 +33,15 @@ class StateWatcher:
     """
 
     def __init__(
-        self, path: Path = DEFAULT_STATE_PATH, on_event: OnEvent | None = None
+        self,
+        path: Path = DEFAULT_STATE_PATH,
+        on_event: OnEvent | None = None,
+        *,
+        poll_interval_s: float = POLL_INTERVAL_S,
     ) -> None:
         self.path = path
         self.on_event: OnEvent = on_event if on_event is not None else _noop
+        self._poll_interval_s = poll_interval_s
         self._last_mtime: float = 0.0
         self._last_timestamp: float = 0.0
         self._stop = threading.Event()
@@ -57,7 +62,7 @@ class StateWatcher:
     def _run(self) -> None:
         logger.debug("polling thread running")
         self._emit_current()
-        while not self._stop.wait(POLL_INTERVAL_S):
+        while not self._stop.wait(self._poll_interval_s):
             self._poll()
         logger.debug("polling thread exiting")
 

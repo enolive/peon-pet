@@ -5,29 +5,13 @@ wiring stays in __main__, and `claim_single_instance` is public so tests don't
 trip `reportPrivateUsage`.
 """
 
-from collections.abc import Generator, Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 
 import pytest
 from PyQt6 import QtWidgets
 
 from peon_pet.__main__ import claim_single_instance
-
-
-@pytest.fixture
-def single_instance_server_name() -> Iterator[str]:
-    """Yield a unique single-instance server name; remove it after the test.
-
-    The name is unique per test (uuid4) so claims never collide across tests.
-    `QLocalServer.removeServer` is static, so teardown needs no running app.
-    """
-    import uuid
-
-    from PyQt6 import QtNetwork
-
-    name = f"peon-pet-test-{uuid.uuid4().hex}"
-    yield name
-    QtNetwork.QLocalServer.removeServer(name)
 
 
 class TestClaimSingleInstance:

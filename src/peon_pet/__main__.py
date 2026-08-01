@@ -1,4 +1,13 @@
-"""Entry point: parse args, run the Qt event loop."""
+"""Entry point: parse args, build the Qt app, run the event loop.
+
+`run` wires the app (window, watcher, tray) for parsed args and returns the
+window — it receives the `QApplication` rather than constructing one, and does
+NOT call `app.exec()`. `main` creates the app, calls `run`, then blocks on
+`app.exec()` + `sys.exit` — the real entry point. The split makes the wired
+chain testable: tests pass a per-test app fixture into `run(...)` and drive the
+event loop themselves (e.g. `qtbot.waitUntil`), instead of fighting a blocking
+`app.exec()` owned by the function under test.
+"""
 
 from __future__ import annotations
 
@@ -21,13 +30,45 @@ from .demo import Demo
 from .prefs import Prefs
 from .state import PetStateMachine
 from .tray import TrayIcon
-from .watcher import StateWatcher
+from .watcher import POLL_INTERVAL_S, StateWatcher
 from .window import PetWindow
 
 logger = logging.getLogger(__name__)
 
 
-def main(argv: Sequence[str] | None = None) -> None:
+def main(
+    argv: Sequence[str] | None = None,
+    *,
+    single_instance_name: str = "peon-pet",
+    poll_interval_s: float = POLL_INTERVAL_S,
+) -> None:
+    """Build the app and block on its event loop. The real entry point."""
+    app = QtWidgets.QApplication(sys.argv)
+    app.setApplicationName("Peon Pet")
+    _win = run(
+        app,
+        argv,
+        single_instance_name=single_instance_name,
+        poll_interval_s=poll_interval_s,
+    )
+    sys.exit(app.exec())
+
+
+def run(
+    app: QtWidgets.QApplication,
+    argv: Sequence[str] | None = None,
+    *,
+    single_instance_name: str = "peon-pet",
+    poll_interval_s: float = POLL_INTERVAL_S,
+) -> PetWindow:
+    """Wire the app's window/watcher/tray for the parsed args, return the window.
+
+    Receives the `QApplication` (created by `main`, or a per-test fixture) rather
+    than constructing one, so tests can own the app's lifecycle and avoid two
+    `QApplication`s coexisting. Does NOT call `app.exec()` — `main` does that.
+    Pre-loop failures (bad atlas, bad anim arg, list-events) still `sys.exit` here
+    since there's no app to return to.
+    """
     args = parse_args(argv)
 
     logging.basicConfig(
@@ -46,9 +87,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     except ValueError as e:
         print(f"ERROR: {e}", file=sys.stderr)
         sys.exit(1)
-    app = QtWidgets.QApplication(sys.argv)
-    app.setApplicationName("Peon Pet")
-    claim_single_instance(app)
+    claim_single_instance(app, name=single_instance_name)
 
     try:
         win = PetWindow(prefs)
@@ -76,10 +115,12 @@ def main(argv: Sequence[str] | None = None) -> None:
     if args.demo:
         logger.info("demo mode")
         # we need to marshal state events onto the GUI thread.
-        seam = _Seam()
+        seam = _Seam(parent=app)
         seam.anim_changed.connect(lambda a: win.play(a, True))
-        demo = Demo()
+        demo = Demo(interval_s=poll_interval_s)
         demo.on_anim_changed = seam.anim_changed.emit
+        # pattern as the watcher in the --watch branch.
+        app.setProperty("peon_pet_demo", demo)
         demo.start()
     elif args.anim:
         try:
@@ -92,18 +133,20 @@ def main(argv: Sequence[str] | None = None) -> None:
     elif args.watch:
         logger.info("watching %s", args.watch)
         # we need to marshal state events onto the GUI thread.
-        seam = _Seam()
+        seam = _Seam(parent=app)
         state.on_anim_changed = seam.anim_changed.emit
         state.on_session_count_changed = seam.session_count_changed.emit
         seam.anim_changed.connect(win.play)
         seam.session_count_changed.connect(win.set_session_count)
         win.finished.connect(state.on_finished)
         tray.on_reset_to_idle.connect(state.clear)
-        watcher = StateWatcher(args.watch)
+        watcher = StateWatcher(args.watch, poll_interval_s=poll_interval_s)
         watcher.on_event = state.handle_event
+        # expose the watcher for testing so we can stop it after each integration test
+        app.setProperty("peon_pet_watcher", watcher)
         watcher.start()
 
-    sys.exit(app.exec())
+    return win
 
 
 @final

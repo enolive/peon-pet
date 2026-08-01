@@ -18,6 +18,15 @@ class TestReadBoundary:
 
         assert sut.seen == [(Event.SESSION_START, "s1")]
 
+    def test_missing_session_id_is_skipped(self, tmp_path: Path) -> None:
+        state_path = tmp_path / ".state.json"
+        _write_state_to_file(state_path, "SessionStart", None, 1.0)
+        sut = WatcherDriver(state_path)
+
+        sut.emit_current()
+
+        assert sut.seen == []
+
     def test_unknown_event_name_is_skipped(self, tmp_path: Path) -> None:
         state_path = tmp_path / ".state.json"
         _write_state_to_file(state_path, "NotARealEvent", "s1", 1.0)
@@ -36,6 +45,15 @@ class TestReadBoundary:
 
         assert sut.seen == []
 
+    def test_state_file_without_last_active_is_skipped(self, tmp_path: Path) -> None:
+        state_path = tmp_path / ".state.json"
+        state_path.write_text("{}")
+        sut = WatcherDriver(state_path)
+
+        sut.emit_current()
+
+        assert sut.seen == []
+
     def test_emit_current_on_missing_file_does_not_crash(self, tmp_path: Path) -> None:
         state_path = tmp_path / ".state.json"
         sut = WatcherDriver(state_path)
@@ -45,7 +63,7 @@ class TestReadBoundary:
         assert sut.seen == []
 
 
-class TestPollSuppression:
+class TestPoll:
     def test_does_not_reemit_when_mtime_unchanged(self, tmp_path: Path) -> None:
         state_path = tmp_path / ".state.json"
         _write_state_to_file(state_path, "SessionStart", "s1", 1.0)
@@ -118,7 +136,7 @@ class TestPollSuppression:
         assert sut.seen == []
 
 
-def _write_state_to_file(path: Path, event: object, sid: object, ts: float) -> None:
+def _write_state_to_file(path: Path, event: object, sid: str | None, ts: float) -> None:
     path.write_text(
         json.dumps(
             {"last_active": {"event": event, "session_id": sid, "timestamp": ts}}
