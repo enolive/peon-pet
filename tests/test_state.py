@@ -67,6 +67,24 @@ class TestWarmStartReactions:
         assert anims == [Anim.TYPING]
         assert sm.base_anim == Anim.TYPING
 
+    def test_warm_session_start_does_not_downgrade_an_active_session(self) -> None:
+        sm, anims, _counts = _wire_state_machine_with_recording_callbacks()
+        sm.handle_event(Event.SESSION_START, "s1")
+        sm.handle_event(Event.USER_PROMPT_SUBMIT, "s1")  # ACTIVE
+        assert sm.base_anim == Anim.TYPING
+
+        # A redundant SessionStart (e.g. adapter 'resume') must not flip s1 IDLE —
+        # that would make on_finished settle to SLEEPING while the task is running.
+        sm.handle_event(Event.SESSION_START, "s1")
+
+        assert sm.base_anim == Anim.TYPING, (
+            "active session must survive a warm SessionStart"
+        )
+        # And on_finished still settles to TYPING, not SLEEPING:
+        anims.clear()
+        sm.on_finished()
+        assert anims == [Anim.TYPING]
+
     def test_stop_flips_idle_celebrates_then_sleeps(self) -> None:
         sm, anims, _counts = _wire_state_machine_with_recording_callbacks()
         sm.handle_event(Event.SESSION_START, "s1")

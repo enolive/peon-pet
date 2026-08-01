@@ -61,7 +61,15 @@ class _SessionRegistry:
 
     def add(self, session_id: str) -> None:
         with self._lock:
-            self._sessions[session_id] = (_SessionState.IDLE, time.time())
+            # Create-only: a redundant `SessionStart` for an already-known session
+            # must not downgrade it (an ACTIVE session mid-task would otherwise flip
+            # to IDLE, and `on_finished` would then settle to SLEEPING while the
+            # session is still running). Refresh last-seen either way.
+            if session_id in self._sessions:
+                state, _ = self._sessions[session_id]
+                self._sessions[session_id] = (state, time.time())
+            else:
+                self._sessions[session_id] = (_SessionState.IDLE, time.time())
 
     def set_active(self, session_id: str) -> None:
         with self._lock:
