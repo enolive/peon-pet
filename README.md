@@ -1,8 +1,10 @@
 # Peon Pet
 
-![2b sleeping](intro.png)
+![2b sleeping](docs/intro.png)
 
 A friendly companion to [PeonPing](https://www.peonping.com/). Will read its state and animate it in different manners.
+
+<video src="docs/demo.webm" autoplay loop muted playsinline width="400"></video>
 
 ## Features
 
