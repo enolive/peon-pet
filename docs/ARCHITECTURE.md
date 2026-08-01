@@ -50,7 +50,7 @@ file and drives the state machine. The state machine is pure Python (no Qt); it 
 of known sessions, each IDLE or ACTIVE, and translates peon-ping events into a target anim.
 
 **Base anim** is `TYPING` if any session is ACTIVE, else `SLEEPING`. After a one-shot reaction plays out,
-`PetWindow.finished` → `state.on_finished()` → settle to base.
+`PetWindow.finished` -> `state.on_finished()` -> settle to base.
 
 **Cold start:** the watcher replays the last event on startup with an empty registry. A cold event that registers a
 session announces `WAKING` (regardless of its own reaction) so a cold `Stop` doesn't spuriously celebrate. A cold
@@ -63,7 +63,7 @@ session announces `WAKING` (regardless of its own reaction) so a cold `Stop` doe
 atomically (tempfile + `os.replace`), which breaks `QFileSystemWatcher`'s inode watch, so we poll mtime instead. On a
 new mtime with a newer timestamp, it parses `last_active` into a typed `(Event,
 session_id)` and calls `on_event`. Unknown event names / missing fields are skipped at this read boundary (the only
-place str→`Event` parsing happens).
+place str->`Event` parsing happens).
 
 `poll_interval_s` is injectable (default 0.5s) so tests can run fast.
 

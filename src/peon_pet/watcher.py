@@ -22,15 +22,10 @@ OnEvent = Callable[[Event, str], None]
 
 @final
 class StateWatcher:
-    """Polls peon-ping's state file (mtime-based) and calls on_event(event, session_id).
-
-    Polling runs in a daemon thread. Because the callback fires on that thread,
-    callers crossing into a GUI thread must marshal themselves — typically via
-    a Qt signal at the seam (see __main__).
-
-    peon-ping writes .state.json atomically (tempfile + os.replace), which breaks
-    QFileSystemWatcher's inode-based watch — so we poll mtime instead.
-    """
+    """The on_event callback fires on the daemon thread, so callers crossing
+    into a GUI thread must marshal themselves (see __main__'s seam). peon-ping
+    writes .state.json atomically (tempfile + os.replace), which breaks
+    QFileSystemWatcher's inode watch, hence mtime polling."""
 
     def __init__(
         self,
@@ -47,8 +42,6 @@ class StateWatcher:
         self._thread: threading.Thread | None = None
 
     def start(self) -> None:
-        """Begin polling in a daemon thread. Emits the current event first so
-        consumers sync to current reality, then polls for changes."""
         self._stop.clear()
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
@@ -59,6 +52,8 @@ class StateWatcher:
         logger.debug("stop requested")
 
     def _run(self) -> None:
+        # Emits the current event first so consumers sync to current reality,
+        # then polls for changes.
         logger.debug("polling thread running")
         self._emit_current()
         while not self._stop.wait(self._poll_interval_s):
@@ -66,8 +61,7 @@ class StateWatcher:
         logger.debug("polling thread exiting")
 
     def _emit_current(self) -> None:
-        """Emit the current event and record its timestamp so the next poll
-        doesn't re-emit it."""
+        # Records the event's timestamp so the next poll doesn't re-emit it.
         self._last_mtime = self._mtime()
         self._emit(self._read_last_active())
 
@@ -87,12 +81,9 @@ class StateWatcher:
         self._emit(last_active)
 
     def _emit(self, last_active: dict[str, object] | None) -> None:
-        """Parse last_active into an (Event, session_id) pair and invoke on_event.
-
-        Called from both `_emit_current` and `_poll`. Updates `_last_timestamp`
-        so the next poll doesn't re-emit an older event. Unknown event names or
-        missing fields are skipped (the read boundary — the only place str→Event
-        parsing happens)."""
+        # Updates `_last_timestamp` so the next poll doesn't re-emit an older
+        # event. Unknown event names or missing fields are skipped here, the
+        # only place str-to-Event parsing happens.
         if last_active is None:
             return
         self._last_timestamp = self._ts(last_active)
@@ -120,7 +111,6 @@ class StateWatcher:
             return 0.0
 
     def _read_last_active(self) -> dict[str, object] | None:
-        """Read last_active from the state file, or None on any error."""
         try:
             with self.path.open() as f:
                 st = json.load(f)

@@ -1,4 +1,4 @@
-"""Tests for the Event enum and its str→Event parsing."""
+"""Tests for the Event enum and its str->Event parsing."""
 
 import pytest
 

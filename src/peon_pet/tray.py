@@ -1,8 +1,8 @@
 """System tray icon with the pet's control menu.
 
-Separate entity from PetWindow: the tray is the control surface (icon in the
-panel + context menu), the window is the view (the sprite on screen). They
-share no state; `__main__` wires them together.
+Separate from PetWindow: the tray is the control surface (panel icon + menu),
+the window is the view (the sprite). They share no state; `__main__` wires
+them together.
 """
 
 from typing import final
@@ -14,8 +14,6 @@ from .config import ICONS
 
 @final
 class TrayIcon(QtWidgets.QSystemTrayIcon):
-    """Peon Pet's tray icon."""
-
     on_toggle_visibility = QtCore.pyqtSignal()
     on_reset_to_idle = QtCore.pyqtSignal()
 

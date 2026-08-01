@@ -1,4 +1,4 @@
-"""Tests for StateWatcher's str→Event parsing at the read boundary."""
+"""Tests for StateWatcher's str->Event parsing at the read boundary."""
 
 import json
 import os

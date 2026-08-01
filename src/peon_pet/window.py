@@ -19,7 +19,7 @@ SPRITE_SIZE: int = 180  # inset like the JS (PlaneGeometry 180 in a 200 win)
 def cell_rect(frame: int, row: int, cell_w: float, cell_h: float) -> QtCore.QRectF:
     """Source rect of the sprite cell at `frame` (column), `row` in the atlas.
 
-    Pure math over the atlas grid — no Qt application needed to construct or
+    Pure math over the atlas grid - no Qt application needed to construct or
     assert on the returned `QRectF` (a value type). Extracted from `paintEvent`
     so the "which sprite" math is testable without rendering.
     """
@@ -27,10 +27,10 @@ def cell_rect(frame: int, row: int, cell_w: float, cell_h: float) -> QtCore.QRec
 
 
 def missing_anims(rows: int) -> list[Anim]:
-    """Anims whose configured row is at or beyond `rows` (→ fall back to row 0).
+    """Anims whose configured row is at or beyond `rows` (-> fall back to row 0).
 
-    Pure given the atlas row count. The stderr warning stays in
-    `_warn_missing_anims`; this is the testable core.
+    Pure given the atlas row count; the stderr warning stays in
+    `_warn_missing_anims` so this stays testable without rendering.
     """
     return [a for a in Anim if ANIM_CONFIG[a].row >= rows]
 
@@ -75,7 +75,6 @@ class PetWindow(QtWidgets.QWidget):
 
         atlas = prefs.atlas
         loops = prefs.loops
-        # Load atlas + border assets from the configured layout.
         layout = ATLAS_LAYOUTS[atlas]
         self.atlas = QtGui.QPixmap(str(ASSETS / layout.filename))
         if self.atlas.isNull():
@@ -97,7 +96,6 @@ class PetWindow(QtWidgets.QWidget):
         self._session_count = 0
         self.timer = QtCore.QTimer(self)
         _ = self.timer.timeout.connect(self.advance)
-        # Play the initial event (or idle) once at startup.
         self.play(start_anim)
 
         # Position: saved overrides the default bottom-left corner.
@@ -120,9 +118,9 @@ class PetWindow(QtWidgets.QWidget):
     def play(self, anim: Anim, play_forever: bool = False) -> None:
         """Switch to `anim` and render it.
 
-        Looping anims (sleeping, typing) loop forever. One-shot anims
-        (waking, alarmed, …) play `loops` times, then emit `finished` — the
-        caller (state machine) decides what follows. Never self-switches.
+        Looping anims (sleeping, typing) loop forever. One-shot anims (waking,
+        alarmed, etc.) play `loops` times then emit `finished`; the caller
+        (state machine) decides what follows. Never self-switches.
         """
         self.anim = anim
         cfg = ANIM_CONFIG[anim]
@@ -142,7 +140,6 @@ class PetWindow(QtWidgets.QWidget):
             self.timer.start()
 
     def _warn_missing_anims(self, atlas: str) -> None:
-        """Warn once at startup about anims the atlas can't render (too few rows)."""
         missing = missing_anims(self._rows)
         if not missing:
             return
@@ -163,8 +160,8 @@ class PetWindow(QtWidgets.QWidget):
             else:
                 self._loops_played += 1
                 if self._loops_played >= self.loops:
-                    # Reaction played out — hold the last frame as a fallback.
-                    # In practice the synchronous finished → state → play(base)
+                    # Reaction played out - hold the last frame as a fallback.
+                    # In practice the synchronous finished -> state -> play(base)
                     # chain switches at this loop boundary without a freeze.
                     self.frame = self.max_frames - 1
                     self.finished.emit()
@@ -217,28 +214,23 @@ class PetWindow(QtWidgets.QWidget):
         p = QtGui.QPainter(self)
         p.setRenderHint(QtGui.QPainter.RenderHint.SmoothPixmapTransform, False)
 
-        # Sprite: current cell of the atlas, scaled to SPRITE_SIZE, centered
         sx = (WIN_SIZE - SPRITE_SIZE) // 2
         sy = (WIN_SIZE - SPRITE_SIZE) // 2
         src = cell_rect(self.frame, self.row, self.cell_w, self.cell_h)
         p.drawPixmap(QtCore.QRectF(sx, sy, SPRITE_SIZE, SPRITE_SIZE), self.atlas, src)
 
-        # Border: full atlas border image stretched to the window
         p.drawPixmap(
             QtCore.QRectF(self.rect()),
             self.border,
             QtCore.QRectF(0, 0, self.border.width(), self.border.height()),
         )
 
-        # Active-session badge (top-right), drawn last so it sits on top.
+        # Badge last so it sits on top.
         if self._session_count > 0:
             self._draw_badge(p)
 
     def _draw_badge(self, p: QtGui.QPainter) -> None:
-        """Draw a red circular badge with the session count, top-right.
-
-        Caps the displayed number at 9+ so the badge stays a fixed size.
-        """
+        # Cap at 9+ so the badge stays a fixed size.
         text = str(self._session_count) if self._session_count <= 9 else "9+"
         diameter = 22
         margin = 8

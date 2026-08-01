@@ -1,6 +1,6 @@
 """Atlas layouts and animation config (pure rendering data).
 
-Event → behavior mapping lives in state.py.
+Event -> behavior mapping lives in events.py.
 """
 
 from dataclasses import dataclass
@@ -12,7 +12,7 @@ ICONS = files(__package__) / "icons"
 
 
 class Anim(StrEnum):
-    """Animation states — one per atlas row."""
+    """Animation states - one per atlas row."""
 
     SLEEPING = "sleeping"
     WAKING = "waking"
@@ -24,8 +24,6 @@ class Anim(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class AtlasLayout:
-    """Sprite atlas grid layout + optional border overlay filename."""
-
     filename: str
     cols: int
     rows: int
@@ -34,21 +32,18 @@ class AtlasLayout:
 
 @dataclass(frozen=True, slots=True)
 class AnimConfig:
-    """Atlas row layout for one animation."""
-
     row: int
     frames: int
     fps: int
     loop: bool
 
 
-# Known atlases: short name -> layout. border defaults to None when absent.
+# Known atlases: short name -> layout.
 ATLAS_LAYOUTS: dict[str, AtlasLayout] = {
     "2b": AtlasLayout("2b-atlas.png", 6, 6, "2b-borders.png"),
     "orc": AtlasLayout("orc-sprite-atlas.png", 6, 6, "orc-borders.png"),
 }
 
-# Atlas row layout: anim -> config.
 ANIM_CONFIG: dict[Anim, AnimConfig] = {
     Anim.SLEEPING: AnimConfig(0, 6, 3, True),
     Anim.WAKING: AnimConfig(1, 6, 8, False),

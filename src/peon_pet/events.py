@@ -1,4 +1,4 @@
-"""Peon-ping event vocabulary — the `Event` enum and its reaction mapping."""
+"""Peon-ping event vocabulary - the `Event` enum and its reaction mapping."""
 
 from __future__ import annotations
 

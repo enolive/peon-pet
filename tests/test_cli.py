@@ -76,7 +76,7 @@ class TestPrintEventAnimMapping:
         print_event_anim_mapping()
 
         out = capsys.readouterr().out
-        assert "event → anim mapping:" in out
+        assert "event -> anim mapping:" in out
         for event in EVENT_REACTION:
             assert event.value in out
         assert Event.SESSION_END.value in out

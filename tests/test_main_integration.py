@@ -1,4 +1,4 @@
-"""Integration tests of the wired --watch chain: watcher → state → seam → window.
+"""Integration tests of the wired --watch chain: watcher -> state -> seam -> window.
 
 These exercise the full `run(app, ...])` path end-to-end with
 offscreen Qt, no display, and no real peon-ping.
@@ -54,7 +54,7 @@ class TestWatchIntegration:
         single_instance_server_name: str,
     ) -> None:
         state_path = tmp_path / ".state.json"
-        # No pre-seeded file → genuinely cold first event.
+        # No pre-seeded file -> genuinely cold first event.
         win = run(
             app,
             ["--watch", str(state_path)],
@@ -109,7 +109,7 @@ class TestAnimIntegration:
         qtbot: QtBot,
         single_instance_server_name: str,
     ) -> None:
-        # No pre-seeded file → genuinely cold first event.
+        # No pre-seeded file -> genuinely cold first event.
         win = run(
             app,
             ["--anim", "annoyed"],

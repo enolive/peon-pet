@@ -1,12 +1,9 @@
 """Entry point: parse args, build the Qt app, run the event loop.
 
-`run` wires the app (window, watcher, tray) for parsed args and returns the
-window — it receives the `QApplication` rather than constructing one, and does
-NOT call `app.exec()`. `main` creates the app, calls `run`, then blocks on
-`app.exec()` + `sys.exit` — the real entry point. The split makes the wired
-chain testable: tests pass a per-test app fixture into `run(...)` and drive the
-event loop themselves (e.g. `qtbot.waitUntil`), instead of fighting a blocking
-`app.exec()` owned by the function under test.
+`run` wires the app and returns the window without calling `app.exec()`; `main`
+creates the app, calls `run`, then blocks on `app.exec()`. The split keeps the
+wired chain testable: tests pass a per-test app fixture into `run(...)` and
+drive the event loop themselves instead of fighting a blocking `app.exec()`.
 """
 
 from __future__ import annotations
@@ -42,8 +39,8 @@ def main(
     single_instance_name: str = "peon-pet",
     poll_interval_s: float = POLL_INTERVAL_S,
 ) -> None:
-    """Build the app and block on its event loop. Raised errors from run() are
-    printed to stderr and exit(1) is called."""
+    """Build the app and block on its event loop. Errors from run() are printed
+    to stderr and exit(1) is called."""
     try:
         app = QtWidgets.QApplication(sys.argv)
         app.setApplicationName("Peon Pet")
@@ -66,11 +63,11 @@ def run(
     single_instance_name: str = "peon-pet",
     poll_interval_s: float = POLL_INTERVAL_S,
 ) -> PetWindow:
-    """Wire the app's window/watcher/tray for the parsed args, return the window.
+    """Wire window/watcher/tray for the parsed args and return the window.
 
-    Receives the `QApplication` (created by `main`, or a per-test fixture) rather
-    than constructing one, so tests can own the app's lifecycle and avoid two
-    `QApplication`s coexisting. Does NOT call `app.exec()` — `main` does that.
+    Receives the `QApplication` (created by `main`, or a per-test fixture) so
+    tests can own the app's lifecycle and avoid two QApplications coexisting.
+    Does NOT call `app.exec()`; `main` does that.
     """
     args = parse_args(argv)
 
@@ -113,7 +110,6 @@ def run(
         seam = _Seam(parent=app)
         seam.anim_changed.connect(lambda a: win.play(a, True))
         demo = Demo(on_anim_changed=seam.anim_changed.emit, interval_s=poll_interval_s)
-        # pattern as the watcher in the --watch branch.
         app.setProperty("peon_pet_demo", demo)
         demo.start()
     elif args.anim:
@@ -146,10 +142,9 @@ def run(
 class _Seam(QtCore.QObject):
     """Marshals state-machine anim changes onto the GUI thread.
 
-    The state machine runs on the watcher's daemon thread (and is also touched
-    from the GUI thread via window.finished). Its only GUI-thread requirement is
-    that `win.play` runs on the GUI thread — so the seam sits at the state→window
-    boundary, not at watcher→state. Created on the GUI thread.
+    The state machine runs on the watcher's daemon thread; its only GUI-thread
+    requirement is that `win.play` runs on the GUI thread, so the seam sits at
+    the state->window boundary, not at watcher->state.
     """
 
     anim_changed = QtCore.pyqtSignal(Anim)
@@ -159,13 +154,9 @@ class _Seam(QtCore.QObject):
 def claim_single_instance(app: QtWidgets.QApplication, name: str = "peon-pet") -> None:
     """Exit if another peon-pet is running; otherwise claim the instance slot.
 
-    Qt local server is the portable single-instance primitive: a second launch
-    connects to the first's socket and bails out. `removeServer` clears any
-    stale socket left by a crashed previous run before we listen. The server is
-    parented to `app` so it outlives this function call.
-
-    `name` is injectable so tests can claim a unique server and avoid colliding
-    with each other or a real running instance.
+    Uses a Qt local server: a second launch connects to the first's socket and
+    bails out. `name` is injectable so tests can claim a unique server and avoid
+    colliding with each other or a real running instance.
     """
     from PyQt6 import QtNetwork
 
@@ -175,6 +166,7 @@ def claim_single_instance(app: QtWidgets.QApplication, name: str = "peon-pet") -
         print("peon-pet is already running.", file=sys.stderr)
         sys.exit(1)
     socket.close()
+    # Clear any stale socket left by a crashed previous run before we listen.
     QtNetwork.QLocalServer.removeServer(name)
     if not QtNetwork.QLocalServer(app).listen(name):
         print("ERROR: could not start single-instance server", file=sys.stderr)

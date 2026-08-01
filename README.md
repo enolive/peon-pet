@@ -11,10 +11,11 @@ A friendly companion to [PeonPing](https://www.peonping.com/). Will read its sta
 - **Watch Mode**: Automatically updates the pet's state based on PeonPing's activity.
 - **Customizable Character**: Choose between different character designs (`orc` and `2b`). Or create and include your
   own in `src/peon_pet/config.py`.
-- **Tray Control**: Show/Hide pet or quit the program.
+- **Tray Control**: Show/Hide pet, clean up sessions, or quit the program.
 - **Draggable Window**: Pet is in your way? No problem, drag it somewhere else.
 - **Support for multiple sessions**: Pet displays the number of active sessions in a badge.
 - **Agent agnostic**: Pet only relies on an installed and working PeonPing. Use the agents you like!
+- **Platform independent**: Will run on any platform that has Qt6 and Python3 available.
 
 > [!NOTE]
 > Multiple-session support is best effort only. Peon Ping does not keep track of this, so we

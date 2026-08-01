@@ -1,10 +1,7 @@
 """User preferences from ~/.config/peon-pet/config.json.
 
-Owns the config file and the resolution/validation of its values. Two clearly
-separated categories:
-
-- Read-only: `atlas`, `loops`. User edits the file; the app never writes these.
-- Volatile: `position` (window position). App reads on start, writes on drag.
+Two categories: read-only (`atlas`, `loops` - user edits, app never writes) and
+volatile (`position` - app reads on start, writes on drag).
 """
 
 from __future__ import annotations
@@ -21,14 +18,12 @@ DEFAULT_ATLAS = "2b"
 
 
 def _config_path() -> Path:
-    """XDG config path for user prefs."""
     xdg = os.environ.get("XDG_CONFIG_HOME")
     base = Path(xdg) if xdg else Path.home() / ".config"
     return base / "peon-pet" / "config.json"
 
 
 def _read() -> dict[str, object]:
-    """Load the config file."""
     try:
         data = json.loads(_config_path().read_text())
     except FileNotFoundError:
@@ -38,12 +33,11 @@ def _read() -> dict[str, object]:
 
 @final
 class WindowPosition:
-    """Volatile window position — read on start, written on drag.
+    """Volatile window position - read on start, written on drag.
 
-    Pure data: `(x, y)` ints, no Qt types. The window converts to/from
-    QPoint. `current` reads from the snapshot taken at Prefs construction.
-    `save` re-reads the file (in case it changed), merges the new position,
-    writes.
+    Pure `(x, y)` ints (no Qt types); the window converts to/from QPoint.
+    `current` is the snapshot from Prefs construction; `save` re-reads the file,
+    merges the new position, and writes.
     """
 
     def __init__(self, position: tuple[int, int] | None) -> None:
@@ -64,8 +58,6 @@ class WindowPosition:
 
 @final
 class Prefs:
-    """Owns the config file. Read-only settings are resolved+validated here."""
-
     def __init__(self) -> None:
         data = _read()
         self.atlas = self._resolve_atlas(data)
@@ -80,8 +72,6 @@ class Prefs:
         if a is None:
             return DEFAULT_ATLAS
         available = ", ".join(sorted(ATLAS_LAYOUTS))
-        # this is an error message, nothing to be 100% useful
-        # noinspection string-conversion-without-dunder-method
         raise ValueError(f"config 'atlas' {a!r} is not valid; available: {available}")
 
     @staticmethod

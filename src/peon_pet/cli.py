@@ -1,10 +1,8 @@
-"""CLI helpers for peon-pet: arg parsing, anim resolution, event listing,
-and the log-level mapping.
+"""CLI helpers: arg parsing, anim resolution, event listing, log-level mapping.
 
-Pure Python — no Qt. `__main__` imports these and keeps the Qt-dependent
-wiring (single-instance claiming, event loop) that can't be unit-tested here.
-Public so tests don't reach across a private-import boundary (which would
-trip `reportPrivateUsage`).
+Pure Python (no Qt) so `__main__` can keep the untestable Qt wiring and these
+helpers stay unit-testable. Public so tests don't trip `reportPrivateUsage` by
+reaching across a private-import boundary.
 """
 
 from __future__ import annotations
@@ -24,7 +22,7 @@ _LOG_LEVELS: tuple[int, int, int] = (logging.WARNING, logging.INFO, logging.DEBU
 
 @dataclass
 class CliArgs:
-    """Parsed CLI args — the seam `main` consumes."""
+    """Parsed CLI args; the seam `main` consumes."""
 
     anim: str | None
     demo: bool
@@ -34,7 +32,6 @@ class CliArgs:
 
 
 def parse_args(argv: Sequence[str] | None) -> CliArgs:
-    """Parse CLI args into a CliArgs dataclass."""
     parser = argparse.ArgumentParser(
         prog="peon-pet",
         description="Desktop pet that reacts to peon-ping events.",
@@ -87,14 +84,13 @@ def resolve_anim(arg: str) -> Anim:
 
 
 def print_event_anim_mapping() -> None:
-    """Print the peon-ping event → anim mapping to stdout for reference."""
-    print("event → anim mapping:")
+    print("event -> anim mapping:")
     for event in EVENT_REACTION:
         anim = EVENT_REACTION[event]
-        print(f"  {event:22s} → {anim.value}")
-    # SessionEnd has no transient reaction — it removes the session and settles
+        print(f"  {event:22s} -> {anim.value}")
+    # SessionEnd has no transient reaction: it removes the session and settles
     # to the base anim (SLEEPING if none remain, else TYPING).
-    print(f"  {Event.SESSION_END.value:22s} → (settle to base: sleeping / typing)")
+    print(f"  {Event.SESSION_END.value:22s} -> (settle to base: sleeping / typing)")
 
 
 def log_level(verbosity: int) -> int:

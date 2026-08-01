@@ -62,7 +62,7 @@ class TestWarmStartReactions:
         sm.handle_event(Event.SESSION_START, "s1")  # IDLE
         anims.clear()
 
-        sm.handle_event(Event.USER_PROMPT_SUBMIT, "s1")  # → ACTIVE
+        sm.handle_event(Event.USER_PROMPT_SUBMIT, "s1")  # -> ACTIVE
 
         assert anims == [Anim.TYPING]
         assert sm.base_anim == Anim.TYPING
@@ -73,7 +73,7 @@ class TestWarmStartReactions:
         sm.handle_event(Event.USER_PROMPT_SUBMIT, "s1")  # ACTIVE
         anims.clear()
 
-        sm.handle_event(Event.STOP, "s1")  # → IDLE, reaction CELEBRATE
+        sm.handle_event(Event.STOP, "s1")  # -> IDLE, reaction CELEBRATE
 
         assert anims == [Anim.CELEBRATE]
         assert sm.base_anim == Anim.SLEEPING
@@ -98,7 +98,6 @@ class TestWarmStartReactions:
     def test_session_end_removes_session_and_settles_to_sleeping(self) -> None:
         sm, anims, counts = _wire_state_machine_with_recording_callbacks()
         sm.handle_event(Event.SESSION_START, "s1")
-
         assert sm.session_active
         counts.clear()
         anims.clear()
@@ -116,6 +115,7 @@ class TestWarmStartReactions:
 class TestMultipleSessions:
     def test_sessions_are_started_and_ended(self) -> None:
         sm, _, counts = _wire_state_machine_with_recording_callbacks()
+
         sm.handle_event(Event.SESSION_START, "s1")
         sm.handle_event(Event.SESSION_START, "s2")
         sm.handle_event(Event.SESSION_END, "s1")
@@ -127,6 +127,7 @@ class TestMultipleSessions:
 
     def test_sessions_stay_active(self) -> None:
         sm, anims, counts = _wire_state_machine_with_recording_callbacks()
+
         sm.handle_event(Event.SESSION_START, "s1")
         sm.handle_event(Event.SESSION_START, "s2")
 
@@ -137,6 +138,7 @@ class TestMultipleSessions:
 
     def test_sessions_can_mix_cold_and_warm_start(self) -> None:
         sm, anims, counts = _wire_state_machine_with_recording_callbacks()
+
         sm.handle_event(Event.SESSION_START, "s1")
         sm.handle_event(Event.PRE_TOOL_USE, "s1")
         sm.handle_event(Event.STOP, "s2")
@@ -172,12 +174,11 @@ class TestClear:
 class TestResolveAnim:
     def test_falls_back_to_base_for_session_end(self) -> None:
         sm, _anims, _counts = _wire_state_machine_with_recording_callbacks()
-
-        # Empty registry → base SLEEPING; SessionEnd has no reaction entry.
+        # Empty registry -> base SLEEPING; SessionEnd has no reaction entry.
         assert sm.resolve_anim(Event.SESSION_END) == Anim.SLEEPING
 
         sm.handle_event(Event.SESSION_START, "s1")
-        sm.handle_event(Event.USER_PROMPT_SUBMIT, "s1")  # ACTIVE → base TYPING
+        sm.handle_event(Event.USER_PROMPT_SUBMIT, "s1")  # ACTIVE -> base TYPING
 
         assert sm.resolve_anim(Event.SESSION_END) == Anim.TYPING
 

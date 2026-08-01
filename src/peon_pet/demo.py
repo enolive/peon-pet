@@ -1,12 +1,10 @@
-"""Demo mode — cycles through every Anim forever, for visual QA.
+"""Demo mode - cycles every Anim forever, for visual QA.
 
-Pure Python, like the watcher: a daemon thread that calls `on_anim_changed`
-every `interval` seconds. `__main__` marshals the cross-thread callback onto the
-GUI thread via the seam signal, same as for the state machine.
-
-Each anim is played with `play_forever=True` (the window loops its frames
-instead of emitting `finished`), so one-shots cycle visibly and there's no
-freeze — the demo just advances on its timer.
+Pure Python like the watcher: a daemon thread calls `on_anim_changed` every
+`interval` seconds; `__main__` marshals it onto the GUI thread via the seam,
+same as for the state machine. Each anim is played with `play_forever=True` (the
+window loops its frames instead of emitting `finished`) so one-shots cycle
+visibly with no freeze - the demo just advances on its timer.
 """
 
 from __future__ import annotations
@@ -25,8 +23,6 @@ OnAnim = Callable[[Anim], None]
 
 @final
 class Demo:
-    """Cycles through every Anim forever on a daemon thread."""
-
     def __init__(
         self,
         on_anim_changed: OnAnim,
