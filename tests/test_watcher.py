@@ -5,7 +5,7 @@ import os
 import time
 from pathlib import Path
 
-from peon_pet.state import Event
+from peon_pet.events import Event
 from peon_pet.watcher import StateWatcher
 from tests.assertions import wait_until
 

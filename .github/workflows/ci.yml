@@ -21,6 +21,15 @@ jobs:
         with:
           enable-cache: true
 
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Check agentic config
+        run: ./agent-lint.sh
+
       - name: Install dependencies
         run: uv sync
 

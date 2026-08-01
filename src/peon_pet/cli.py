@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .config import ANIM_CONFIG, Anim
-from .state import EVENT_REACTION, Event
+from .events import EVENT_REACTION, Event
 from .watcher import DEFAULT_STATE_PATH
 
 _LOG_LEVELS: tuple[int, int, int] = (logging.WARNING, logging.INFO, logging.DEBUG)

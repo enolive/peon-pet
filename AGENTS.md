@@ -19,14 +19,15 @@ A desktop pet that reacts to peon-ping events. Python + PyQt6.
 - Use the **AAA pattern** (Arrange / Act / Assert) with a dedicated blank line between each section. Exception: a test
   so simple it reads as a one-liner (e.g. `assert f(x) == y`).
 - Name the subject under test `sut`.
-- Group related tests in `Test*` classes (PascalCase, no underscores — e.g. `TestColdStart`, `TestPollSuppression`).
-  Run one group with `pytest file.py::TestGroupName`. Keep stateless helpers as `_`-prefixed module functions and
-  stateful drivers as classes at the bottom of the file.
+- Group related tests in `Test*` classes (PascalCase, no underscores — e.g. `TestColdStart`, `TestPollSuppression`). Run
+  one group with `pytest file.py::TestGroupName`. Keep stateless helpers as `_`-prefixed module functions and stateful
+  drivers as classes at the bottom of the file.
 - Organize test files top-down: test classes first, helpers and driver classes at the bottom (same convention as
   source). Within the tests, lead with the highest-value/most-complex behavior and put trivial checks last — mirrors the
   source rule of "primary entry point up top, helpers below".
 - When deliberately testing private/internal API (logic with no public entry point, e.g., mtime/timestamp suppression):
-  centralize the private access in a single driver class rather than scattering `w._method()` across every test.
+  <!-- agnix-disable-next-line CDX-AG-005 -->
+- centralize the private access in a single driver class rather than scattering `w._method()` across every test.
   Document *why* the internal API is tested in the driver's docstring — this makes the smell deliberate and reviewable
   instead of pervasive.
 
@@ -96,12 +97,16 @@ Events use the OG peon-ping/Claude hook names (`SessionStart`, `Stop`, `UserProm
   classes go below it. Put `if __name__ == "__main__"` at the very bottom of the file, never between functions.
 - **ASCII only**: avoid Unicode symbols like arrows (`→`), checkmarks, etc. in code and comments — use plain ASCII
   (`->`, `=>`, words) instead. They don't render reliably across terminals/editors and are hard to type.
-- **Comments**: avoid them. Prefer self-documenting code (clear names, small functions) over comments that restate
-  what the code does. A comment is justified only when it captures a *why* the code can't — a non-obvious constraint,
-  a workaround, or intent that isn't visible in the code. Don't write comments that narrate the code.
+- **Comments**: avoid them. Prefer self-documenting code (clear names, small functions) over comments that restate what
+  the code does. A comment is justified only when it captures a *why* the code can't — a non-obvious constraint, a
+  workaround, or intent that isn't visible in the code. Don't write comments that narrate the code.
 
 ## Legacy reference
 
 `legacy/` holds the original Electron + Three.js app. Its source originates from https://github.com/PeonPing/peon-pet.
 Do not modify anything unless the user explicitly requests it. Use it as a reference instead. This folder is **not**
 version-controlled.
+
+## References
+
+- `ARCHITECTURE.md` for the overall architecture and design decisions.

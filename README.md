@@ -14,10 +14,6 @@ A friendly companion to [PeonPing](https://www.peonping.com/). Will read its sta
 - **Support for multiple sessions**: Pet displays the number of active sessions in a badge.
 - **Agent agnostic**: Pet only relies on an installed and working PeonPing. Use the agents you like!
 
-> [!WARNING]
-> Experimental, **use at your own risk**.
-> Still has to meet my own quality standards.
-
 > [!NOTE]
 > Multiple-session support is best effort only. Peon Ping does not keep track of this, so we
 > have no agent-agnostic way to reliably identify them all.
@@ -26,6 +22,11 @@ A friendly companion to [PeonPing](https://www.peonping.com/). Will read its sta
 > If you believe the number of active sessions is totally of, you can reset them via the Tray Control.
 
 ## Installation
+
+Requirements:
+
+* [uv]([https://github.com/uvloop/uvloop](https://docs.astral.sh/uv/)): Package manager
+* [Python 3](https://www.python.org/): uv will try to bootstrap it if not present
 
 ```bash
 ./install.sh

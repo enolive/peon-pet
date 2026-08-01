@@ -15,7 +15,7 @@ from peon_pet.cli import (
     resolve_anim,
 )
 from peon_pet.config import Anim
-from peon_pet.state import EVENT_REACTION, Event
+from peon_pet.events import EVENT_REACTION, Event
 
 
 class TestParseArgs:
