@@ -8,7 +8,7 @@ from PyQt6.QtTest import QSignalSpy
 from pytestqt.qtbot import QtBot
 
 from peon_pet.config import ANIM_CONFIG, Anim
-from peon_pet.prefs import Prefs
+from peon_pet.prefs import Prefs, WindowPosition
 from peon_pet.window import PetWindow, cell_rect, missing_anims
 
 
@@ -39,6 +39,18 @@ class TestFinishedBoundary:
             sut.advance()
 
         assert len(finished_spy) == 0
+
+
+class TestSavedPosition:
+    def test_restores_saved_position_on_construction(self, qtbot: QtBot) -> None:
+        prefs = _make_prefs()
+        prefs.position = WindowPosition((123, 456))
+
+        sut = PetWindow(prefs)
+        qtbot.addWidget(sut)
+
+        assert sut.pos().x() == 123
+        assert sut.pos().y() == 456
 
 
 class TestHelperFunctions:

@@ -39,7 +39,7 @@ def missing_anims(rows: int) -> list[Anim]:
 class PetWindow(QtWidgets.QWidget):
     # Class-level type declarations (assigned in __init__).
     atlas: QtGui.QPixmap
-    border: QtGui.QPixmap | None
+    border: QtGui.QPixmap
     cell_w: float
     cell_h: float
     loops: int
@@ -80,13 +80,10 @@ class PetWindow(QtWidgets.QWidget):
         self.atlas = QtGui.QPixmap(str(ASSETS / layout.filename))
         if self.atlas.isNull():
             raise RuntimeError(f"failed to load atlas: {layout.filename}")
-        if layout.border is not None:
-            border = QtGui.QPixmap(str(ASSETS / layout.border))
-            if border.isNull():
-                raise RuntimeError(f"failed to load border: {layout.border}")
-            self.border = border
-        else:
-            self.border = None
+        border = QtGui.QPixmap(str(ASSETS / layout.border))
+        if border.isNull():
+            raise RuntimeError(f"failed to load border: {layout.border}")
+        self.border = border
         self.cell_w = self.atlas.width() / layout.cols
         self.cell_h = self.atlas.height() / layout.rows
         self.loops = loops
@@ -226,13 +223,12 @@ class PetWindow(QtWidgets.QWidget):
         src = cell_rect(self.frame, self.row, self.cell_w, self.cell_h)
         p.drawPixmap(QtCore.QRectF(sx, sy, SPRITE_SIZE, SPRITE_SIZE), self.atlas, src)
 
-        # Border: full atlas border image stretched to the window (if configured)
-        if self.border is not None:
-            p.drawPixmap(
-                QtCore.QRectF(self.rect()),
-                self.border,
-                QtCore.QRectF(0, 0, self.border.width(), self.border.height()),
-            )
+        # Border: full atlas border image stretched to the window
+        p.drawPixmap(
+            QtCore.QRectF(self.rect()),
+            self.border,
+            QtCore.QRectF(0, 0, self.border.width(), self.border.height()),
+        )
 
         # Active-session badge (top-right), drawn last so it sits on top.
         if self._session_count > 0:

@@ -29,7 +29,7 @@ class AtlasLayout:
     filename: str
     cols: int
     rows: int
-    border: str | None = None
+    border: str
 
 
 @dataclass(frozen=True, slots=True)
