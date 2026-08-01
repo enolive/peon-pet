@@ -100,8 +100,3 @@ def print_event_anim_mapping() -> None:
 def log_level(verbosity: int) -> int:
     """Map a -v count to a logging level, clamped to DEBUG."""
     return _LOG_LEVELS[min(verbosity, len(_LOG_LEVELS) - 1)]
-
-
-if __name__ == "__main__":
-    # Sanity: print the event→anim mapping when run directly.
-    print_event_anim_mapping()

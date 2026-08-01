@@ -93,6 +93,21 @@ def test_position_save_preserves_other_settings(
     assert re_read.position.current == (10, 20)
 
 
+@pytest.mark.parametrize(
+    "window",
+    [{}, None, {"x": 1}, {"x": "1", "y": 2}],
+    ids=["empty", "none", "partial", "invalid"],
+)
+def test_position_defaults_to_none_on_invalid_window_object(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, window: object
+) -> None:
+    _write_config(tmp_path, {"window": window})
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    sut = Prefs()
+
+    assert sut.position.current is None
+
+
 def _write_config(tmp_path: Path, data: dict[str, object]) -> None:
     cfg = tmp_path / "peon-pet" / "config.json"
     cfg.parent.mkdir(parents=True, exist_ok=True)

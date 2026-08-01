@@ -190,7 +190,7 @@ class PetStateMachine:
     def __init__(self) -> None:
         self._sessions = _SessionRegistry()
         self.on_anim_changed: Callable[[Anim], None] = _noop
-        self.on_session_count_changed: Callable[[int], None] = _noop_count
+        self.on_session_count_changed: Callable[[int], None] = _noop
 
     @property
     def session_active(self) -> bool:
@@ -275,9 +275,5 @@ class PetStateMachine:
         self.on_session_count_changed(self._sessions.count)
 
 
-def _noop(_anim: Anim) -> None:
-    pass
-
-
-def _noop_count(_n: int) -> None:
+def _noop(*_a: object) -> None:
     pass
