@@ -9,10 +9,10 @@ A desktop pet that reacts to peon-ping events. Python + PyQt6.
 - Always assume the user has changed content between two queries. Therefore, re-read any file you want to touch before
   editing it.
 - When the user asks you to write some implementation, insist on a test-first approach. There are acceptable exceptions
-  for that, for instance
+  for that. The point is to make good development practice a habit. Deviations from it should be a deliberate choice.
+  For instance:
   - a quick proof something actually is possible
   - something not tested yet
-- The point is to make good development practice a habit. Deviations from it should be a deliberate choice.
 
 ### Test style
 
@@ -102,7 +102,7 @@ Events use the OG peon-ping/Claude hook names (`SessionStart`, `Stop`, `UserProm
   workaround, or intent that isn't visible in the code. Don't write comments that narrate the code.
 - **Docstrings**: keep them to a minimum. A module or function docstring is justified only when the name and signature
   <!-- agnix-disable-next-line PE-006 - not a negative instruction  -->
-- don't already convey the contract — e.g. a non-obvious invariant, a responsibility the code can't show, or a *why*
+  don't already convey the contract — e.g. a non-obvious invariant, a responsibility the code can't show, or a *why*
   that would otherwise need a comment. Don't restate what the code does; don't pad. The one standing exception is the
   driver-class docstring in tests (see Test style) that documents *why* internal API is under test.
 
