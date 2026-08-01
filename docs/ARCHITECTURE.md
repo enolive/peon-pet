@@ -54,8 +54,7 @@ of known sessions, each IDLE or ACTIVE, and translates peon-ping events into a t
 
 **Cold start:** the watcher replays the last event on startup with an empty registry. A cold event that registers a
 session announces `WAKING` (regardless of its own reaction) so a cold `Stop` doesn't spuriously celebrate. A cold
-`SessionEnd` (nothing to wake) falls through to base. See `state.py`'s
-`handle_event` docstring.
+`SessionEnd` (nothing to wake) falls through to base.
 
 ## The state watcher
 

@@ -100,6 +100,11 @@ Events use the OG peon-ping/Claude hook names (`SessionStart`, `Stop`, `UserProm
 - **Comments**: avoid them. Prefer self-documenting code (clear names, small functions) over comments that restate what
   the code does. A comment is justified only when it captures a *why* the code can't — a non-obvious constraint, a
   workaround, or intent that isn't visible in the code. Don't write comments that narrate the code.
+- **Docstrings**: keep them to a minimum. A module or function docstring is justified only when the name and signature
+  <!-- agnix-disable-next-line PE-006 - not a negative instruction  -->
+- don't already convey the contract — e.g. a non-obvious invariant, a responsibility the code can't show, or a *why*
+  that would otherwise need a comment. Don't restate what the code does; don't pad. The one standing exception is the
+  driver-class docstring in tests (see Test style) that documents *why* internal API is under test.
 
 ## Legacy reference
 

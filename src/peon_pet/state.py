@@ -1,25 +1,10 @@
-"""Pet behavior state machine.
+"""Pet behavior state machine — translates peon-ping events into anims.
+Pure Python, no Qt: emits via callbacks; the caller marshals to the GUI thread.
 
-Translates peon-ping events into animations. Pure Python — no Qt, no timers.
-It calls a single outbound callback (`on_anim_changed`) whenever the target
-anim changes; the caller decides what to do with it (typically marshal to a
-GUI thread via a seam signal).
-
-Two-state model, one registry
-----------------------------
-Each known session is one entry in `_SessionRegistry`, carrying a per-session
-state plus a last-seen timestamp:
-
-- IDLE:   session alive, not currently working (e.g. just after SessionStart,
-          or after a Stop completed the task).
-- ACTIVE: session working (UserPromptSubmit / PreToolUse / PostToolUse).
-
-`SessionStart` adds a session (IDLE); working events flip it to ACTIVE; `Stop`
-flips it back to IDLE (task done, session still alive); `SessionEnd` removes it.
-
-Base anim is TYPING if any session is ACTIVE, else SLEEPING. So after a Stop
-the pet sleeps (task done) even while the session is still open — the badge
-(session count) disambiguates "no session" from "idle-but-present".
+Two-state model: each known session is IDLE or ACTIVE. Base anim is TYPING if
+any session is ACTIVE, else SLEEPING — so after a Stop the pet sleeps even
+while the session is still open, and the badge (session count) disambiguates
+"no session" from "idle-but-present".
 """
 
 from __future__ import annotations
@@ -72,12 +57,9 @@ _SESSION_END_EVENTS: frozenset[Event] = frozenset({Event.SESSION_END})
 class _SessionRegistry:
     """Known sessions keyed by id, each with a state and last-seen timestamp.
 
-    No cleanup
-    runs yet — the registry grows until a SessionEnd lands, so `reconcile` is
-    the seam a future timer would call. However, we have a user reconcile action
-    to clear everything.
-
-    Thread-safe via `_lock` — the registry owns its own concurrency.
+    No cleanup runs yet — the registry grows until a SessionEnd lands, so
+    `reconcile` is the seam a future timer would call. (There's a user action to
+    clear everything.) Thread-safe via `_lock`.
     """
 
     def __init__(self) -> None:
@@ -160,27 +142,10 @@ class PetStateMachine:
     def handle_event(self, event: Event, session_id: str) -> None:
         """Process a peon-ping event, emitting the appropriate anim.
 
-        Cold start
-        -----------
-        The watcher replays the last peon-ping event once on startup, when the
-        registry is empty, so the pet's first event for a session arrives with
-        no prior `SessionStart`. A cold start is such a first event for a session
-        the registry had never tracked: detected by checking `__contains__`
-        *before* the update (`cold_start`).
-
-        Working/`Stop` events also register an unknown session (alive-if-new
-        recovery, so the badge isn't 0 for a cold `Stop`), so a cold start that
-        lands a session in the registry — `SessionStart`, or any working/`Stop`
-        event on a new session — means a session genuinely exists now. We
-        announce it with `waking` regardless of the event's own reaction, so a
-        cold `Stop` doesn't spuriously celebrate and a cold working event doesn't
-        jump straight to `typing` without a wake.
-
-        The exception is a cold `SessionEnd` replay: the session was never
-        tracked and `discard` leaves it absent, so there's nothing to wake for
-        and nothing to reflect — it falls through to `resolve_anim`, which has
-        no `SessionEnd` reaction and settles to the base anim (sleeping). Live
-        events for already-tracked sessions keep their normal reaction.
+        On a cold start (first event for an unknown session), the reaction is
+        overridden to `WAKING` regardless of the event's own reaction — so a cold
+        `Stop` doesn't spuriously celebrate and a cold working event doesn't
+        skip the wake. A cold `SessionEnd` (nothing to wake) settles to base.
         """
         cold_start = session_id not in self._sessions
 

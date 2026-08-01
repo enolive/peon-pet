@@ -19,12 +19,7 @@ def pytest_configure() -> None:
 
 @pytest.fixture
 def single_instance_server_name() -> Iterator[str]:
-    """Yield a unique single-instance server name; remove it after the test.
-
-    The name is unique per test (uuid4) so claims never collide across tests.
-    `QLocalServer.removeServer` is static, so teardown needs no running app.
-    Shared by the single-instance unit tests and the --watch integration test.
-    """
+    """Yield a unique single-instance server name; remove registered local server it after the test."""
     import uuid
 
     from PyQt6 import QtNetwork

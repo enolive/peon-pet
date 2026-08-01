@@ -42,11 +42,8 @@ def main(
     single_instance_name: str = "peon-pet",
     poll_interval_s: float = POLL_INTERVAL_S,
 ) -> None:
-    """
-    Build the app and block on its event loop. The real entry point.
-
-    Raised errors from run() are printed to stderr and exit(1) is called.
-    """
+    """Build the app and block on its event loop. Raised errors from run() are
+    printed to stderr and exit(1) is called."""
     try:
         app = QtWidgets.QApplication(sys.argv)
         app.setApplicationName("Peon Pet")
