@@ -94,6 +94,8 @@ Events use the OG peon-ping/Claude hook names (`SessionStart`, `Stop`, `UserProm
   breaks after `pip install`.
 - **File layout**: organize files top-down. The primary entry point / public function goes at the top; helpers and data
   classes go below it. Put `if __name__ == "__main__"` at the very bottom of the file, never between functions.
+- **ASCII only**: avoid Unicode symbols like arrows (`→`), checkmarks, etc. in code and comments — use plain ASCII
+  (`->`, `=>`, words) instead. They don't render reliably across terminals/editors and are hard to type.
 
 ## Legacy reference
 

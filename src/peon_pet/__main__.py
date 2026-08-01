@@ -140,8 +140,11 @@ def run(
         seam.session_count_changed.connect(win.set_session_count)
         win.finished.connect(state.on_finished)
         tray.on_reset_to_idle.connect(state.clear)
-        watcher = StateWatcher(args.watch, poll_interval_s=poll_interval_s)
-        watcher.on_event = state.handle_event
+        watcher = StateWatcher(
+            path=args.watch,
+            poll_interval_s=poll_interval_s,
+            on_event=state.handle_event,
+        )
         # expose the watcher for testing so we can stop it after each integration test
         app.setProperty("peon_pet_watcher", watcher)
         watcher.start()

@@ -2,10 +2,50 @@
 
 import json
 import os
+import time
+from collections.abc import Callable
 from pathlib import Path
 
 from peon_pet.state import Event
 from peon_pet.watcher import StateWatcher
+
+
+class TestThread:
+    def test_start_emits_current_then_polls_new_events(self, tmp_path: Path) -> None:
+        state_path = tmp_path / ".state.json"
+        _write_state_to_file(state_path, "SessionStart", "s1", 1.0)
+        sut = WatcherDriver(path=state_path, poll_interval_s=0.05)
+        try:
+            sut.start()
+            assert _wait_until(lambda: sut.seen == [(Event.SESSION_START, "s1")])
+
+            _write_state_to_file(state_path, "UserPromptSubmit", "s1", 2.0)
+
+            assert _wait_until(
+                lambda: (
+                    sut.seen
+                    == [(Event.SESSION_START, "s1"), (Event.USER_PROMPT_SUBMIT, "s1")]
+                )
+            )
+        finally:
+            sut.stop()
+
+    def test_stop_halts_consumption(self, tmp_path: Path) -> None:
+        state_path = tmp_path / ".state.json"
+        _write_state_to_file(state_path, "SessionStart", "s1", 1.0)
+        sut = WatcherDriver(path=state_path, poll_interval_s=0.05)
+        sut.start()
+        assert _wait_until(lambda: sut.seen == [(Event.SESSION_START, "s1")])
+
+        sut.stop()
+        _write_state_to_file(state_path, "UserPromptSubmit", "s1", 2.0)
+
+        # After stop, a few poll intervals pass with no new emit — the thread has
+        # exited its loop. A short sleep (not _wait_until) is right here: we're
+        # asserting the *absence* of a change, so we must give it time to (not)
+        # happen, then check it didn't.
+        time.sleep(0.2)
+        assert sut.seen == [(Event.SESSION_START, "s1")]
 
 
 class TestReadBoundary:
@@ -148,6 +188,21 @@ def _set_mtime(path: Path, mtime: float) -> None:
     os.utime(path, (mtime, mtime))
 
 
+def _wait_until(predicate: Callable[[], bool], *, timeout_s: float = 2.0) -> bool:
+    """Poll `predicate` every 5ms until it's true or `timeout_s` elapses.
+
+    No Qt here — `StateWatcher`'s thread runs independently of any event loop,
+    so a plain sleep-poll is the right primitive (and deterministic: returns as
+    soon as the condition holds rather than over-sleeping).
+    """
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        if predicate():
+            return True
+        time.sleep(0.005)
+    return predicate()
+
+
 class WatcherDriver:
     """Drives a StateWatcher's polling steps synchronously, without its thread.
 
@@ -167,11 +222,19 @@ class WatcherDriver:
 
     _watcher: StateWatcher
 
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, poll_interval_s: float = 0.05) -> None:
         self.seen: list[tuple[Event, str]] = []
         self._watcher = StateWatcher(
-            path, on_event=lambda e, s: self.seen.append((e, s))
+            path=path,
+            on_event=lambda e, s: self.seen.append((e, s)),
+            poll_interval_s=poll_interval_s,
         )
+
+    def start(self) -> None:
+        self._watcher.start()
+
+    def stop(self) -> None:
+        self._watcher.stop()
 
     def emit_current(self) -> None:
         """Act: the watcher's initial sync (one `_emit_current`)."""

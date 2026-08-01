@@ -34,13 +34,12 @@ class StateWatcher:
 
     def __init__(
         self,
+        on_event: OnEvent,
         path: Path = DEFAULT_STATE_PATH,
-        on_event: OnEvent | None = None,
-        *,
         poll_interval_s: float = POLL_INTERVAL_S,
     ) -> None:
         self.path = path
-        self.on_event: OnEvent = on_event if on_event is not None else _noop
+        self.on_event: OnEvent = on_event
         self._poll_interval_s = poll_interval_s
         self._last_mtime: float = 0.0
         self._last_timestamp: float = 0.0
@@ -136,7 +135,3 @@ class StateWatcher:
 def _field(last_active: dict[str, object], key: str) -> str | None:
     v = last_active.get(key)
     return v if isinstance(v, str) else None
-
-
-def _noop(_event: Event, _session_id: str) -> None:
-    pass
