@@ -4,7 +4,7 @@
 
 A friendly companion to [PeonPing](https://www.peonping.com/). Will read its state and animate it in different manners.
 
-<video src="https://github.com/enolive/peon-pet/blob/main/docs/demo.webm" autoplay loop muted playsinline width="400"></video>
+<video src="https://raw.githubusercontent.com/enolive/peon-pet/main/docs/demo.webm" autoplay loop muted playsinline width="400"></video>
 
 ## Features
 
