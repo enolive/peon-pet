@@ -61,14 +61,12 @@ Peon pet creates a `config.json` inside your config directory, usually `~/.confi
 }
 ```
 
-**`window`**: current position of the window on your screen. Defaults to bottom left on your primary screen.
-
-**`atlas`*: which character to use. Defaults to `2b`. There is also `orc` available.
-
-**`loops`**: how many times to loop an animation. Defaults to `3`.
+- **`window`**: current position of the window on your screen. Defaults to bottom left on your primary screen.
+- **`atlas`**: which character to use. Defaults to `2b`. There is also `orc` available.
+- **`loops`**: how many times to loop an animation. Defaults to `3`.
 
 > [!NOTE]
-> 'typing' and 'idle' loop forever.
+> 'typing' and 'sleeping' loop forever.
 
 ## Available animations
 
