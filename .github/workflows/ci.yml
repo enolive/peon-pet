@@ -21,6 +21,15 @@ jobs:
         with:
           enable-cache: true
 
+      # required only for agent-lint. No cache, so it does not get pinned
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Check agentic config
+        run: ./agent-lint.sh
+
       - name: Install dependencies
         run: uv sync
 

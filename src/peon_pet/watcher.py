@@ -9,7 +9,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import final
 
-from .state import Event
+from .events import Event
 
 DEFAULT_STATE_PATH = Path.home() / ".claude" / "hooks" / "peon-ping" / ".state.json"
 POLL_INTERVAL_S = 0.5

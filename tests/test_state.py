@@ -5,7 +5,8 @@ from typing import ClassVar
 import pytest
 
 from peon_pet.config import Anim
-from peon_pet.state import EVENT_REACTION, Event, PetStateMachine
+from peon_pet.events import EVENT_REACTION, Event
+from peon_pet.state import PetStateMachine
 
 
 class TestColdStart:

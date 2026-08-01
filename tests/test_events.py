@@ -2,7 +2,7 @@
 
 import pytest
 
-from peon_pet.state import EVENT_REACTION, KNOWN_EVENTS, Event
+from peon_pet.events import EVENT_REACTION, KNOWN_EVENTS, Event
 
 
 @pytest.mark.parametrize("name", [e.value for e in Event])
