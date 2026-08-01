@@ -1,0 +1,105 @@
+# Architecture
+
+Peon Pet is a desktop pet that watches PeonPing's state file and animates a sprite in response. It's a small Python app
+(~1500 LOC including tests) with a clear split between pure logic (trivially testable) and Qt wiring (one integration
+test).
+
+## The big picture
+
+```mermaid
+flowchart TD
+    PP[peon-ping writes .state.json]
+    SW[StateWatcher<br/>daemon thread]
+    SM[PetStateMachine]
+    SEAM[_Seam<br/>Qt signal]
+    WIN[PetWindow<br/>GUI thread]
+    PP -- mtime poll --> SW
+    SW -- typed Event, session_id --> SM
+    SM -- on_anim_changed --> SEAM
+    SM -- on_session_count_changed --> SEAM
+    SEAM -- win . play anim --> WIN
+    SEAM -- win . set_session_count --> WIN
+    WIN -- finished signal --> SM
+    SM -- on_finished: settle to base --> SEAM
+```
+
+Two threads: the GUI thread runs `QApplication.exec()` and owns `PetWindow`; the watcher's daemon thread polls the state
+file and drives the state machine. The state machine is pure Python (no Qt); it calls back into the GUI thread via
+`_Seam`, a `QObject` with signals that `AutoConnection` marshals across threads.
+
+## Modules
+
+`src/peon_pet/`, top-down by dependency:
+
+| Module        | Role                                                                                                                   | Qt? |
+|---------------|------------------------------------------------------------------------------------------------------------------------|-----|
+| `__main__.py` | Entry point.                                                                                                           | yes |
+| `cli.py`      | Pure CLI helpers.                                                                                                      | no  |
+| `window.py`   | `PetWindow` — frameless transparent always-on-top widget. Sprite atlas rendering, animation loop, drag, session badge. | yes |
+| `tray.py`     | `TrayIcon` — system tray icon + context menu. Control surface, no state.                                               | yes |
+| `state.py`    | `PetStateMachine` — translates peon-ping events into anims. Owns the session registry + dispatch.                      | no  |
+| `events.py`   | `Event` enum + `EVENT_REACTION`/`KNOWN_EVENTS` — the peon-ping event vocabulary shared across modules.                 | no  |
+| `watcher.py`  | `StateWatcher` — polls `.state.json` (mtime-based), parses to typed `Event`, calls back. Daemon thread.                | no  |
+| `demo.py`     | `Demo` — cycles every `Anim` forever on a daemon thread. Visual QA mode.                                               | no  |
+| `prefs.py`    | `Prefs` + `WindowPosition` — reads/validates `$XDG_CONFIG_HOME/peon-pet/config.json`.                                  | no  |
+| `config.py`   | Static data: `Anim` enum, `ATLAS_LAYOUTS`, `ANIM_CONFIG`.                                                              | no  |
+
+## The state machine (the heart)
+
+`PetStateMachine` (`state.py`) is the core logic. It owns a `_SessionRegistry`
+of known sessions, each IDLE or ACTIVE, and translates peon-ping events into a target anim.
+
+**Base anim** is `TYPING` if any session is ACTIVE, else `SLEEPING`. After a one-shot reaction plays out,
+`PetWindow.finished` → `state.on_finished()` → settle to base.
+
+**Cold start:** the watcher replays the last event on startup with an empty registry. A cold event that registers a
+session announces `WAKING` (regardless of its own reaction) so a cold `Stop` doesn't spuriously celebrate. A cold
+`SessionEnd` (nothing to wake) falls through to base. See `state.py`'s
+`handle_event` docstring.
+
+## The state watcher
+
+`StateWatcher` (`watcher.py`) polls `$HOME/.claude/hooks/peon-ping/.state.json` on a daemon thread. PeonPing writes
+atomically (tempfile + `os.replace`), which breaks `QFileSystemWatcher`'s inode watch, so we poll mtime instead. On a
+new mtime with a newer timestamp, it parses `last_active` into a typed `(Event,
+session_id)` and calls `on_event`. Unknown event names / missing fields are skipped at this read boundary (the only
+place str→`Event` parsing happens).
+
+`poll_interval_s` is injectable (default 0.5s) so tests can run fast.
+
+## Entry point: `main` vs `run`
+
+`__main__.py` is split so the wired chain is testable:
+
+- **`run(app, argv, ...) -> PetWindow`** — wires the app (window, watcher/demo, tray, seam) for the parsed args and
+  returns the window. Raises errors on bad input (bad anim name, bad atlas).
+- **`main(argv, *, ...) -> None`** — creates the `QApplication`, calls `run`, catches errors to print a pretty `ERROR:`
+  and exit 1, then blocks on `app.exec()`. The real entry point (`peon-pet` script, `__main__`).
+
+The split lets integration tests call `run(...)` with a per-test `QApplication`
+fixture and drive the event loop via `qtbot.waitUntil`, instead of fighting a blocking `app.exec()` owned by the
+function under test.
+
+## Single instance
+
+`claim_single_instance` (`__main__.py`) uses a Qt local server named
+`peon-pet`: a second launch connects to the first's socket and exits 1. The name is injectable so tests don't collide
+with each other or a real instance.
+
+## Tests
+
+`tests/` mirrors `src/` one file per module, plus integration:
+
+- **Unit tests** – the core of the coverage
+- **Integration tests** (`test_main_integration.py`) — `run(app, [...])`
+  end-to-end
+
+See `AGENTS.md` for the test style (AAA, `sut`, `Test*` classes, driver classes for internal-API testing).
+
+## CI
+
+`.github/workflows/ci.yml` runs two parallel jobs on every push/PR to `main`:
+
+- **`check`** – runs format checks and static analysis.
+- **`test`** — executes the tests and reports coverage.
+
