@@ -96,6 +96,9 @@ Events use the OG peon-ping/Claude hook names (`SessionStart`, `Stop`, `UserProm
   classes go below it. Put `if __name__ == "__main__"` at the very bottom of the file, never between functions.
 - **ASCII only**: avoid Unicode symbols like arrows (`→`), checkmarks, etc. in code and comments — use plain ASCII
   (`->`, `=>`, words) instead. They don't render reliably across terminals/editors and are hard to type.
+- **Comments**: avoid them. Prefer self-documenting code (clear names, small functions) over comments that restate
+  what the code does. A comment is justified only when it captures a *why* the code can't — a non-obvious constraint,
+  a workaround, or intent that isn't visible in the code. Don't write comments that narrate the code.
 
 ## Legacy reference
 
