@@ -5,6 +5,7 @@ the window is the view (the sprite). They share no state; `__main__` wires
 them together.
 """
 
+from importlib.resources import as_file
 from typing import final
 
 from PySide6 import QtCore, QtGui, QtWidgets
@@ -24,5 +25,28 @@ class TrayIcon(QtWidgets.QSystemTrayIcon):
         _ = menu.addAction("Show/Hide", self.on_toggle_visibility.emit)
         _ = menu.addAction("Clear all sessions", self.on_reset_to_idle.emit)
         _ = menu.addSeparator()
+        _ = menu.addAction("About", show_about)
         _ = menu.addAction("Quit", app.quit)
         self.setContextMenu(menu)
+
+
+# noinspection HtmlUnknownTarget
+def show_about() -> None:
+    path = ICONS / "peon-pet.png"
+    with as_file(path) as p:
+        icon = p.as_uri()
+        # language=html
+        text = f"""<body style="text-align: center">
+<h1>Peon Pet</h1>
+<p><img src="{icon}" width="100" height="100" alt=""></p>
+<p>Friendly pet companion that reacts to <a href="https://www.peonping.com">PeonPing</a> events.</p>
+<p>
+    <a href="https://github.com/enolive/peon-pet">https://github.com/enolive/peon-pet</a>
+</p>
+</body>"""
+        box = QtWidgets.QMessageBox()
+        box.setWindowTitle("About Peon Pet")
+        box.setIcon(QtWidgets.QMessageBox.Icon.NoIcon)
+        box.setTextFormat(QtCore.Qt.TextFormat.RichText)
+        box.setText(text)
+        _ = box.exec()
