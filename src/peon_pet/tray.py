@@ -43,6 +43,7 @@ def show_about() -> None:
 <p>
     <a href="https://github.com/enolive/peon-pet">https://github.com/enolive/peon-pet</a>
 </p>
+<p>&nbsp;</p>
 </body>"""
         box = QtWidgets.QMessageBox()
         box.setWindowTitle("About Peon Pet")
