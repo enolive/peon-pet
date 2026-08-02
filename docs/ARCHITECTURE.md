@@ -1,7 +1,7 @@
 # Architecture
 
 Peon Pet is a desktop pet that watches PeonPing's state file and animates a sprite in response. It's a small Python app
-(~1500 LOC including tests) with a clear split between pure logic (trivially testable) and Qt wiring (one integration
+(~1700 LOC including tests) with a clear split between pure logic (trivially testable) and Qt wiring (one integration
 test).
 
 ## The big picture
@@ -95,6 +95,18 @@ with each other or a real instance.
   end-to-end
 
 See `../AGENTS.md` for the test style (AAA, `sut`, `Test*` classes, driver classes for internal-API testing).
+
+### UI event handlers: not unit-tested
+
+`PetWindow`'s event handlers (`mousePressEvent`, `mouseMoveEvent`, `paintEvent`, `_draw_badge`, etc.) are deliberately
+not unit-tested. Calling them directly with a constructed `QMouseEvent` re-runs the handler body without Qt's event
+dispatch — that's testing the math, not the integration, and Qt's involvement is the only thing that makes them
+interesting.
+
+Driving them through Qt's event system in tests requires either a display (CI runs `QT_QPA_PLATFORM=offscreen`) or
+significant synthetic-event plumbing. The visual behavior is covered by
+`--demo`; the state-side outcomes (position saved to `config.json`, session count, anim selection) are covered by the
+unit + integration tests.
 
 ## CI
 
