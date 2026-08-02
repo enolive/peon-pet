@@ -59,33 +59,45 @@ class _SessionRegistry:
         self._sessions: dict[str, tuple[_SessionState, float]] = {}
         self._lock = threading.Lock()
 
-    def add(self, session_id: str) -> None:
+    def apply(self, event: Event, session_id: str) -> tuple[bool, bool, int]:
+        # Apply one event to the registry and return (cold_start, added, count)
+        # under a single lock so callers can decide an anim and emit a count from
+        # the same snapshot that can't be torn by a concurrent clear()/on_finished().
+        # `added` is post-mutation membership: False for SessionEnd (it removes)
+        # and for events that keep a known session (set_active/set_idle refresh
+        # but don't add).
         with self._lock:
-            # Create-only: a redundant `SessionStart` for an already-known session
-            # must not downgrade it (an ACTIVE session mid-task would otherwise flip
-            # to IDLE, and `on_finished` would then settle to SLEEPING while the
-            # session is still running). Refresh last-seen either way.
-            if session_id in self._sessions:
-                state, _ = self._sessions[session_id]
-                self._sessions[session_id] = (state, time.time())
-            else:
-                self._sessions[session_id] = (_SessionState.IDLE, time.time())
+            cold_start = session_id not in self._sessions
+            if event in _SESSION_START_EVENTS:
+                self._add(cold_start, session_id)
+            elif event in _TASK_ACTIVE_EVENTS:
+                self._set_active(session_id)
+            elif event in _TASK_IDLE_EVENTS:
+                self._set_idle(session_id)
+            elif event in _SESSION_END_EVENTS:
+                self._discard(session_id)
+            added = session_id in self._sessions
+            return cold_start, added, len(self._sessions)
 
-    def set_active(self, session_id: str) -> None:
-        with self._lock:
-            self._sessions[session_id] = (_SessionState.ACTIVE, time.time())
+    def _add(self, cold_start: bool, session_id: str):
+        # Create-only: a redundant SessionStart for a known session must
+        # not downgrade it (an ACTIVE session mid-task would otherwise
+        # flip to IDLE, and on_finished would settle to SLEEPING while
+        # the session is still running). Refresh last-seen either way.
+        if cold_start:
+            self._set_idle(session_id)
+        else:
+            state, _ = self._sessions[session_id]
+            self._sessions[session_id] = (state, time.time())
 
-    def set_idle(self, session_id: str) -> None:
-        with self._lock:
-            self._sessions[session_id] = (_SessionState.IDLE, time.time())
+    def _set_idle(self, session_id: str):
+        self._sessions[session_id] = (_SessionState.IDLE, time.time())
 
-    def discard(self, session_id: str) -> None:
-        with self._lock:
-            self._sessions.pop(session_id, None)
+    def _set_active(self, session_id: str):
+        self._sessions[session_id] = (_SessionState.ACTIVE, time.time())
 
-    def __contains__(self, session_id: str) -> bool:
-        with self._lock:
-            return session_id in self._sessions
+    def _discard(self, session_id: str):
+        self._sessions.pop(session_id, None)
 
     @property
     def count(self) -> int:
@@ -124,23 +136,12 @@ class PetStateMachine:
         return Anim.TYPING if self._sessions.any_active else Anim.SLEEPING
 
     def handle_event(self, event: Event, session_id: str) -> None:
-        # On a cold start (first event for an unknown session), the reaction is
-        # overridden to `WAKING` regardless of its own, so a cold `Stop` doesn't
-        # spuriously celebrate and a cold working event doesn't skip the wake. A
-        # cold `SessionEnd` (nothing to wake) settles to base.
-        cold_start = session_id not in self._sessions
-
-        if event in _SESSION_START_EVENTS:
-            self._sessions.add(session_id)
-        elif event in _TASK_ACTIVE_EVENTS:
-            self._sessions.set_active(session_id)
-        elif event in _TASK_IDLE_EVENTS:
-            self._sessions.set_idle(session_id)
-        elif event in _SESSION_END_EVENTS:
-            self._sessions.discard(session_id)
-
-        was_session_added = session_id in self._sessions
-        if cold_start and was_session_added:
+        cold_start, added, count = self._sessions.apply(event, session_id)
+        if cold_start and added:
+            # Cold start: the watcher replayed the last peon-ping event on an
+            # unknown session. Override the reaction to WAKING so a cold Stop
+            # doesn't spuriously celebrate and a cold working event doesn't skip
+            # the wake. A cold SessionEnd (nothing to wake) settles to base.
             anim = Anim.WAKING
         else:
             anim = self.resolve_anim(event)
@@ -151,11 +152,11 @@ class PetStateMachine:
             session_id,
             cold_start,
             anim,
-            self._sessions.count,
+            count,
         )
 
         self.on_anim_changed(anim)
-        self.on_session_count_changed(self._sessions.count)
+        self.on_session_count_changed(count)
 
     def resolve_anim(self, event: Event) -> Anim:
         reaction = EVENT_REACTION.get(event)

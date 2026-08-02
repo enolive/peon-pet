@@ -7,6 +7,7 @@ volatile (`position` - app reads on start, writes on drag).
 from __future__ import annotations
 
 import json
+import logging
 import os
 from pathlib import Path
 from typing import final
@@ -15,6 +16,9 @@ from .config import ATLAS_LAYOUTS
 
 DEFAULT_LOOPS = 3
 DEFAULT_ATLAS = "2b"
+
+
+logger = logging.getLogger(__name__)
 
 
 def _config_path() -> Path:
@@ -27,6 +31,9 @@ def _read() -> dict[str, object]:
     try:
         data = json.loads(_config_path().read_text())
     except FileNotFoundError:
+        return {}
+    except json.JSONDecodeError:
+        logger.warning("Failed to parse config file. Using defaults.")
         return {}
     return data
 
@@ -53,7 +60,16 @@ class WindowPosition:
         p.parent.mkdir(parents=True, exist_ok=True)
         data = _read()
         data["window"] = {"x": pos[0], "y": pos[1]}
-        p.write_text(json.dumps(data, indent=2))
+        self._atomic_write(p, json.dumps(data, indent=2))
+
+    @staticmethod
+    def _atomic_write(path: Path, data: str) -> None:
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        with tmp.open("w") as f:
+            f.write(data)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
 
 
 @final

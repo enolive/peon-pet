@@ -19,6 +19,7 @@ from typing import final
 from PyQt6 import QtCore, QtWidgets
 
 from .cli import (
+    CliArgs,
     LogLevel,
     parse_args,
     print_event_anim_mapping,
@@ -33,6 +34,10 @@ from .watcher import POLL_INTERVAL_S, StateWatcher
 from .window import PetWindow
 
 logger = logging.getLogger(__name__)
+
+# Relative path under $XDG_STATE_HOME (or ~/.local/state) for the -vv debug log.
+# Root is dynamic; only the app-relative tail is a constant worth sharing with tests.
+DEBUG_LOG_REL = Path("peon-pet") / "peon-pet-debug.log"
 
 
 def main(
@@ -72,27 +77,7 @@ def run(
     Does NOT call `app.exec()`; `main` does that.
     """
     args = parse_args(argv)
-
-    logging.basicConfig(
-        level=args.log_level.to_stdlib(),
-        format="%(levelname)s %(name)s: %(message)s",
-        stream=sys.stderr,
-    )
-    # At DEBUG (-vv), also log to a file for post-hoc analysis of intermittent
-    # glitches. XDG state dir; append across runs to keep history.
-    if args.log_level is LogLevel.DEBUG:
-        xdg_state = os.environ.get("XDG_STATE_HOME") or str(
-            Path.home() / ".local" / "state"
-        )
-        log_path = Path(xdg_state) / "peon-pet" / "peon-pet-debug.log"
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        file_handler = logging.FileHandler(log_path, mode="a", encoding="utf-8")
-        file_handler.setLevel(logging.DEBUG)
-        file_handler.setFormatter(
-            logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
-        )
-        logging.getLogger().addHandler(file_handler)
-        logger.info("logging to %s", log_path)
+    _configure_logging(args)
     logger.debug("args=%s", args)
 
     if args.list_events:
@@ -113,13 +98,7 @@ def run(
     signal.signal(signal.SIGINT, lambda *_: app.quit())
     timer = QtCore.QTimer()
     timer.start(200)
-
-    def _no_op() -> None:
-        pass
-
-    timer.timeout.connect(_no_op)
-
-    state = PetStateMachine()
+    timer.timeout.connect(lambda: None)
 
     if args.demo:
         logger.info("demo mode")
@@ -134,6 +113,7 @@ def run(
         logger.info("playing %s on startup", anim.value)
         win.play(anim, True)
     elif args.watch:
+        state = PetStateMachine()
         logger.info("watching %s", args.watch)
         # we need to marshal state events onto the GUI thread.
         seam = _Seam(parent=app)
@@ -153,19 +133,6 @@ def run(
         watcher.start()
 
     return win
-
-
-@final
-class _Seam(QtCore.QObject):
-    """Marshals state-machine anim changes onto the GUI thread.
-
-    The state machine runs on the watcher's daemon thread; its only GUI-thread
-    requirement is that `win.play` runs on the GUI thread, so the seam sits at
-    the state->window boundary, not at watcher->state.
-    """
-
-    anim_changed = QtCore.pyqtSignal(Anim)
-    session_count_changed = QtCore.pyqtSignal(int)
 
 
 def claim_single_instance(app: QtWidgets.QApplication, name: str = "peon-pet") -> None:
@@ -188,6 +155,42 @@ def claim_single_instance(app: QtWidgets.QApplication, name: str = "peon-pet") -
     if not QtNetwork.QLocalServer(app).listen(name):
         print("ERROR: could not start single-instance server", file=sys.stderr)
         sys.exit(1)
+
+
+def _configure_logging(args: CliArgs):
+    logging.basicConfig(
+        level=args.log_level.to_stdlib(),
+        format="%(levelname)s %(name)s: %(message)s",
+        stream=sys.stderr,
+    )
+    # At DEBUG (-vv), also log to a file for post-hoc analysis of intermittent
+    # glitches. XDG state dir; append across runs to keep history.
+    if args.log_level is LogLevel.DEBUG:
+        xdg_state = os.environ.get("XDG_STATE_HOME") or str(
+            Path.home() / ".local" / "state"
+        )
+        log_path = Path(xdg_state) / DEBUG_LOG_REL
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        file_handler = logging.FileHandler(log_path, mode="a", encoding="utf-8")
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(
+            logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+        )
+        logging.getLogger().addHandler(file_handler)
+        logger.info("logging to %s", log_path)
+
+
+@final
+class _Seam(QtCore.QObject):
+    """Marshals state-machine anim changes onto the GUI thread.
+
+    The state machine runs on the watcher's daemon thread; its only GUI-thread
+    requirement is that `win.play` runs on the GUI thread, so the seam sits at
+    the state->window boundary, not at watcher->state.
+    """
+
+    anim_changed = QtCore.pyqtSignal(Anim)
+    session_count_changed = QtCore.pyqtSignal(int)
 
 
 if __name__ == "__main__":
