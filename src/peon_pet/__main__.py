@@ -102,7 +102,6 @@ def run(
 
     if args.demo:
         logger.info("demo mode")
-        # we need to marshal state events onto the GUI thread.
         seam = _Seam(parent=app)
         seam.anim_changed.connect(lambda a: win.play(a, True))
         demo = Demo(on_anim_changed=seam.anim_changed.emit, interval_s=poll_interval_s)
@@ -115,7 +114,6 @@ def run(
     elif args.watch:
         state = PetStateMachine()
         logger.info("watching %s", args.watch)
-        # we need to marshal state events onto the GUI thread.
         seam = _Seam(parent=app)
         state.on_anim_changed = seam.anim_changed.emit
         state.on_session_count_changed = seam.session_count_changed.emit
@@ -182,11 +180,14 @@ def _configure_logging(args: CliArgs):
 
 @final
 class _Seam(QtCore.QObject):
-    """Marshals state-machine anim changes onto the GUI thread.
+    """Bridges the state machine's plain callbacks to Qt's signal-slot wiring.
 
-    The state machine runs on the watcher's daemon thread; its only GUI-thread
-    requirement is that `win.play` runs on the GUI thread, so the seam sits at
-    the state->window boundary, not at watcher->state.
+    `PetStateMachine` exposes `on_anim_changed` / `on_session_count_changed`
+    as plain `Callable`s so the state logic stays Qt-free. They can't be
+    `connect()`-ed to Qt slots directly, so this holds the corresponding
+    signals; cross-thread marshaling itself is `Qt.AutoConnection`'s job
+    (sender emitted from the watcher daemon thread, receivers on the GUI
+    thread).
     """
 
     anim_changed = QtCore.pyqtSignal(Anim)

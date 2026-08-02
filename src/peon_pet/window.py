@@ -144,7 +144,7 @@ class PetWindow(QtWidgets.QWidget):
             return
         names = ", ".join(f"{a.value} (row {ANIM_CONFIG[a].row})" for a in missing)
         logger.warning(
-            "atlas %r has %d row(s); %d anim(s) have no sprite and will fall back to row 0: %s",
+            "atlas %r has %d row(s); %d anim(s) have no sprite and will fall back to last available row: %s",
             atlas,
             self._rows,
             len(missing),

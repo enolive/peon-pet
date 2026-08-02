@@ -114,19 +114,23 @@ class TestPlayIdempotent:
         assert sut.anim == Anim.ALARMED
         assert sut.frame == 0
 
+    @pytest.mark.parametrize(
+        "play_forever",
+        [True, False],
+    )
     def test_switching_to_a_different_overridden_loop_config_still_resets(
-        self, qtbot: QtBot
+        self, qtbot: QtBot, play_forever: bool
     ) -> None:
         sut = PetWindow(_make_prefs())
         qtbot.addWidget(sut)
-        sut.play(Anim.ALARMED, play_forever=False)
+        sut.play(Anim.ALARMED, play_forever=not play_forever)
         sut.advance()
         sut.advance()
 
-        sut.play(Anim.ALARMED, play_forever=True)
+        sut.play(Anim.ALARMED, play_forever=play_forever)
 
         assert sut.anim == Anim.ALARMED
-        assert sut.loop == True
+        assert sut.loop == play_forever
         assert sut.frame == 0
 
 
