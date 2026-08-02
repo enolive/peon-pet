@@ -16,6 +16,9 @@ Basic `../install.sh` — builds the wheel, `uv tool install --force`s it, copie
 entry with an absolute `Icon=` path into `$XDG_DATA_HOME/applications/`. Absolute icon path sidesteps the hicolor theme
 machinery (no `index.theme` / cache needed). `update-desktop-database` runs best-effort.
 
+**Preflight.** `../install.sh` checks for `uv` and `curl` up front (clear error + uv install one-liner if missing).
+Missing system Python is a warning only — `uv` can bootstrap one.
+
 ### Remaining
 
 **Web install / `curl … | sh` one-liner.**
@@ -38,21 +41,6 @@ uninstall steps live in one shell script.
 **Autostart entry.** `../install.sh` optionally drops
 `$HOME/.config/autostart/peon-pet.desktop` so the pet launches on login. Likely a
 `--autostart` flag to `../install.sh` (off by default — don't surprise users).
-
-**Preflight.** `../install.sh` checks for required tools before doing anything, and exits with a clear message if
-missing:
-
-- `curl` — needed for the web install / update flow (no-op when installing from a local wheel, but the check is cheap
-  and the message is clearer than a later
-  `command not found`).
-- `uv` — needed to install the wheel into an isolated env.
-- `python3` (or `python` / `py` fallback) — `uv` can fetch its own Python (`uv tool install --python 3.12`), so a
-  missing system Python isn't fatal; the preflight just warns and lets `uv` resolve one. Hard fail only if neither
-  `uv` nor a system Python is usable.
-
-Missing `uv` is the common case on a fresh box — the message should suggest the one-liner from the uv docs
-(`curl -LsSf https://astral.sh/uv/install.sh | sh`)
-rather than just failing.
 
 **Cross-platform.** Linux only for now. macOS / Windows later — they have their own bundle formats (`.app` / `.dmg`,
 `.exe`) and the install model differs enough that a separate script per platform is cleaner than one cross-platform
