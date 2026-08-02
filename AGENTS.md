@@ -60,16 +60,6 @@ LC_ALL=C uv run basedpyright # type-check. LC_ALL=C forces English output
 uv run pytest                # run tests
 ```
 
-## Running on Linux + Wayland
-
-Qt6 should work on Wayland, but if you hit GPU/compositor issues fall back to X11:
-
-```bash
-QT_QPA_PLATFORM=xcb uv run peon-pet
-```
-
-Be transparent about it to the user.
-
 ### Sprite atlases
 
 Each atlas is a grid of sprite frames. Most are 6x6; Layouts are declared in `ATLAS_LAYOUTS` - a new atlas needs its
