@@ -37,6 +37,7 @@ class StateWatcher:
         self.on_event: OnEvent = on_event
         self._poll_interval_s = poll_interval_s
         self._last_mtime: float = 0.0
+        """keeps track of the last modification time of the state file"""
         self._last_timestamp: float = 0.0
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -62,14 +63,14 @@ class StateWatcher:
 
     def _emit_current(self) -> None:
         # Records the event's timestamp so the next poll doesn't re-emit it.
-        self._last_mtime = self._mtime()
+        self._last_mtime = self._current_mtime()
         self._emit(self._read_last_active())
 
     def _poll(self) -> None:
-        mtime = self._mtime()
-        if mtime == self._last_mtime:
+        current_mtime = self._current_mtime()
+        if current_mtime <= self._last_mtime:
             return
-        self._last_mtime = mtime
+        self._last_mtime = current_mtime
         last_active = self._read_last_active()
         if last_active is None:
             return
@@ -104,7 +105,11 @@ class StateWatcher:
         ts = last_active.get("timestamp", 0.0)
         return float(ts) if isinstance(ts, (int, float)) else 0.0
 
-    def _mtime(self) -> float:
+    def _current_mtime(self) -> float:
+        """
+        reads the current modification time of the state file.
+        used as a quick probe before reading its contents.
+        """
         try:
             return self.path.stat().st_mtime
         except OSError:

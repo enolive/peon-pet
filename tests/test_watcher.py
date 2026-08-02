@@ -116,6 +116,22 @@ class TestPoll:
 
         assert sut.seen == []
 
+    def test_does_not_reemit_when_mtime_is_in_the_past(self, tmp_path: Path) -> None:
+        state_path = tmp_path / ".state.json"
+        _write_state_to_file(state_path, "SessionStart", "s1", 1.0)
+        _set_mtime(state_path, 2000.0)
+        sut = WatcherDriver(state_path)
+        sut.emit_current()
+        assert sut.seen == [(Event.SESSION_START, "s1")]
+        sut.seen.clear()
+        _write_state_to_file(state_path, "SessionStart", "s1", 2.0)
+        # if for any reasons the mtime is now in the past, it might be corrupt. ignore it
+        _set_mtime(state_path, 1000.0)
+
+        sut.poll()
+
+        assert sut.seen == []
+
     def test_suppresses_when_mtime_changed_but_timestamp_equal(
         self, tmp_path: Path
     ) -> None:
