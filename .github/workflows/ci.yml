@@ -56,7 +56,7 @@ jobs:
           enable-cache: true
 
       - name: Install Qt6 system libraries
-        # PyQt6's offscreen platform plugin (selected by conftest.py) needs
+        # PySide6's offscreen platform plugin (selected by conftest.py) needs
         # libGL/libEGL/libxkbcommon/libdbus/libxcb, which aren't on the minimal
         # ubuntu-latest image. Only the offscreen plugin is loaded (not xcb),
         # so the libxcb-* util libs aren't needed.

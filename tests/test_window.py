@@ -3,8 +3,8 @@ finished-signal boundary that the state machine depends on.
 """
 
 import pytest
-from PyQt6 import QtCore
-from PyQt6.QtTest import QSignalSpy
+from PySide6 import QtCore
+from PySide6.QtTest import QSignalSpy
 from pytestqt.qtbot import QtBot
 
 from peon_pet.config import ANIM_CONFIG, Anim
@@ -24,7 +24,7 @@ class TestFinishedBoundary:
         for _ in range(cfg.frames * sut.loops):
             sut.advance()
 
-        assert len(finished_spy) == 1
+        assert finished_spy.count() == 1
         assert sut.frame == cfg.frames - 1
 
     def test_looping_anim_never_emits_finished(self, qtbot: QtBot) -> None:
@@ -38,7 +38,7 @@ class TestFinishedBoundary:
         for _ in range(cfg.frames * sut.loops):
             sut.advance()
 
-        assert len(finished_spy) == 0
+        assert finished_spy.count() == 0
 
 
 class TestSavedPosition:

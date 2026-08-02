@@ -9,14 +9,20 @@ with its plugin manager before any test is collected or imported.
 import os
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Protocol, cast
 
 import pytest
-from PyQt6 import QtWidgets
+from PySide6 import QtNetwork, QtWidgets
+
+
+class _Stoppable(Protocol):
+    def stop(self) -> None: ...
 
 
 def pytest_configure() -> None:
     # render Qt offscreen for test purposes
     _ = os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    _ = os.environ.setdefault("PYTEST_QT_API", "pyside6")
 
 
 @pytest.fixture(autouse=True)
@@ -53,19 +59,16 @@ def single_instance_app() -> Iterator[QtWidgets.QApplication]:
     assert isinstance(app, QtWidgets.QApplication)
     yield app
     for key in ("peon_pet_watcher", "peon_pet_demo"):
-        obj = app.property(key)  # pyright: ignore[reportAny]
+        obj = cast(_Stoppable | None, app.property(key))
         if obj is not None:
-            # if the stop function does not exist, this will crash, which is
-            # probably better than testing the object for existence of this method
-            obj.stop()  # pyright: ignore[reportAny]
+            # run() stashes watcher/demo here; stop so the next test is clean.
+            obj.stop()
 
 
 @pytest.fixture
 def single_instance_server_name() -> Iterator[str]:
     """Yield a unique single-instance server name; remove registered local server it after the test."""
     import uuid
-
-    from PyQt6 import QtNetwork
 
     name = f"peon-pet-test-{uuid.uuid4().hex}"
     yield name

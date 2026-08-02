@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from PyQt6 import QtWidgets
+from PySide6 import QtWidgets
 from pytestqt.qtbot import QtBot
 
 from peon_pet.__main__ import DEBUG_LOG_REL, run

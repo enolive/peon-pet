@@ -6,7 +6,7 @@ trip `reportPrivateUsage`.
 """
 
 import pytest
-from PyQt6 import QtWidgets
+from PySide6 import QtWidgets
 
 from peon_pet.__main__ import claim_single_instance
 from tests.assertions import does_not_raise
