@@ -99,7 +99,7 @@ class Prefs:
 
 class _PrefsModel(BaseModel):
     atlas: str = DEFAULT_ATLAS
-    loops: int = Field(gt=0, default=DEFAULT_LOOPS)
+    loops: int = Field(gt=0, default=DEFAULT_LOOPS, strict=True)
     window: _WindowPositionModel | None = None
 
     @staticmethod
@@ -108,5 +108,5 @@ class _PrefsModel(BaseModel):
 
 
 class _WindowPositionModel(BaseModel):
-    x: int
-    y: int
+    x: int = Field(strict=True)
+    y: int = Field(strict=True)

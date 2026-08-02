@@ -78,7 +78,7 @@ def test_reads_loops(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     assert sut.loops == 5
 
 
-@pytest.mark.parametrize("loops", [0, -1, "three", 1.5])
+@pytest.mark.parametrize("loops", [0, -1, "three", "5", 1.5])
 def test_loops_defaults_when_invalid(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, loops: object
 ) -> None:
@@ -121,8 +121,15 @@ def test_position_save_preserves_other_settings(
 
 @pytest.mark.parametrize(
     "window",
-    [{}, None, {"x": 1}, {"x": "1", "y": 2.5}],
-    ids=["empty", "none", "partial", "invalid"],
+    [{}, None, {"x": 1}, {"x": "1", "y": 2}, {"x": 1, "y": "2"}, {"x": "1", "y": 2.5}],
+    ids=[
+        "empty",
+        "none",
+        "partial",
+        "string-coordinate-x",
+        "string-coordinate-y",
+        "invalid",
+    ],
 )
 def test_position_defaults_to_none_on_invalid_window_object(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, window: object
