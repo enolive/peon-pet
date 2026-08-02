@@ -9,7 +9,7 @@ quality.
 
 ```bash
 # lint agent configs
-./aget-lint.sh
+./agent-lint.sh
 # install all dependencies
 uv sync
 # format files

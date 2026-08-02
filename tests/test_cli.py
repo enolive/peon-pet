@@ -9,7 +9,6 @@ from typing import ClassVar
 import pytest
 
 from peon_pet.cli import (
-    CliArgs,
     LogLevel,
     parse_args,
     print_event_anim_mapping,
@@ -17,24 +16,31 @@ from peon_pet.cli import (
 )
 from peon_pet.config import Anim
 from peon_pet.events import EVENT_REACTION, Event
+from peon_pet.watcher import DEFAULT_STATE_PATH
 
 
 class TestParseArgs:
-    def test_defaults_when_no_args(self) -> None:
+    def test_defaults_to_watch_when_no_args(self) -> None:
         args = parse_args([])
 
-        assert args == CliArgs(
-            anim=None,
-            demo=False,
-            watch=None,
-            list_events=False,
-            verbose=0,
-        )
+        assert args.watch == DEFAULT_STATE_PATH
+        assert args.demo is False
+        assert args.anim is None
+        assert args.list_events is False
+        assert args.log_level is LogLevel.WARNING
+
+    def test_defaults_to_watch_with_only_verbose(self) -> None:
+        args = parse_args(["-v"])
+
+        assert args.watch is not None
+        assert args.watch.name == ".state.json"
+        assert args.log_level is LogLevel.INFO
 
     def test_anim_name_is_parsed(self) -> None:
         args = parse_args(["--anim", "waking"])
 
         assert args.anim == "waking"
+        assert args.watch is None
 
     _EXPECTED_LOG_LEVELS: ClassVar[list[tuple[str, LogLevel]]] = [
         ("--verbose", LogLevel.INFO),
@@ -62,7 +68,7 @@ class TestParseArgs:
         assert args.demo is True
         assert args.watch is None
 
-    def test_watch_defaults_to_peon_ping_state_path(self) -> None:
+    def test_watch_flag_uses_peon_ping_state_path(self) -> None:
         args = parse_args(["--watch"])
 
         assert args.watch is not None
@@ -78,6 +84,7 @@ class TestParseArgs:
         args = parse_args(["--list-events"])
 
         assert args.list_events is True
+        assert args.watch is None
 
 
 class TestResolveAnim:
