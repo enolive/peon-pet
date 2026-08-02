@@ -18,6 +18,8 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/peon_pet"]
+# original sprite files are not needed in the distribution
+exclude = ["**/*.ase"]
 
 [tool.pytest.ini_options]
 log_level = "DEBUG"          # capture DEBUG+ per test; shown on failure
