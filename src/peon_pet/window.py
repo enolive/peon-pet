@@ -97,7 +97,7 @@ class PetWindow(QtWidgets.QWidget):
         self._drag_offset = None
         self._session_count = 0
         self.timer = QtCore.QTimer(self)
-        _ = self.timer.timeout.connect(self.advance)
+        _ = self.timer.timeout.connect(self.advance)  # pyright: ignore[reportUnknownMemberType]
         self.play(start_anim)
 
         # Position: saved overrides the default bottom-left corner.
