@@ -120,23 +120,21 @@ class PetWindow(QtWidgets.QWidget):
 
         Looping anims (sleeping, typing) loop forever. One-shot anims (waking,
         alarmed, etc.) play `loops` times then emit `finished`; the caller
-        (state machine) decides what follows. Never self-switches.
+        (state machine) decides what follows. A redundant call with the same
+        anim and loop behavior is a no-op to reduce the flicker.
         """
+        cfg = ANIM_CONFIG[anim]
+        loop = True if play_forever else cfg.loop
+        if getattr(self, "anim", None) is anim and getattr(self, "loop", None) is loop:
+            return
         logger.debug("play %s%s", anim.value, " (forever)" if play_forever else "")
         self.anim = anim
-        cfg = ANIM_CONFIG[anim]
-        loop: bool
-        if play_forever:
-            loop = True
-        else:
-            loop = cfg.loop
         self.row = min(cfg.row, self._rows - 1)
         self.max_frames = cfg.frames
-        fps = cfg.fps
         self.loop = loop
         self.frame = 0
         self._loops_played = 0
-        self.timer.setInterval(int(1000 / fps))
+        self.timer.setInterval(int(1000 / cfg.fps))
         if not self.timer.isActive():
             self.timer.start()
 

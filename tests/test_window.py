@@ -82,6 +82,54 @@ class TestHelperFunctions:
         assert missing_anims(4) == [Anim.CELEBRATE, Anim.ANNOYED]
 
 
+class TestPlayIdempotent:
+    """
+    Repeated events that resolve to the same anim (e.g. every PreToolUse
+    during a busy session maps to TYPING) must not restart the animation -
+    otherwise the sprite snaps back to frame 0 mid-cycle and visibly flashes.
+    """
+
+    def test_redundant_play_does_not_reset_frame(self, qtbot: QtBot) -> None:
+        sut = PetWindow(_make_prefs())
+        qtbot.addWidget(sut)
+        sut.play(Anim.TYPING)
+        sut.advance()
+        sut.advance()
+        sut.advance()
+        frame_before = sut.frame
+
+        sut.play(Anim.TYPING)
+
+        assert sut.frame == frame_before
+
+    def test_switching_to_a_different_anim_still_resets(self, qtbot: QtBot) -> None:
+        sut = PetWindow(_make_prefs())
+        qtbot.addWidget(sut)
+        sut.play(Anim.TYPING)
+        sut.advance()
+        sut.advance()
+
+        sut.play(Anim.ALARMED)
+
+        assert sut.anim == Anim.ALARMED
+        assert sut.frame == 0
+
+    def test_switching_to_a_different_overridden_loop_config_still_resets(
+        self, qtbot: QtBot
+    ) -> None:
+        sut = PetWindow(_make_prefs())
+        qtbot.addWidget(sut)
+        sut.play(Anim.ALARMED, play_forever=False)
+        sut.advance()
+        sut.advance()
+
+        sut.play(Anim.ALARMED, play_forever=True)
+
+        assert sut.anim == Anim.ALARMED
+        assert sut.loop == True
+        assert sut.frame == 0
+
+
 def _make_prefs() -> Prefs:
     """Prefs with the default atlas and a tiny loop count for fast boundary tests."""
     # Offscreen Qt: construction without a display. Defaults suffice (atlas
