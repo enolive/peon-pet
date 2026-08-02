@@ -20,6 +20,19 @@ def test_defaults_when_config_absent(
     assert sut.position.current is None
 
 
+def test_defaults_when_config_is_malformed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_raw_config(tmp_path, "{not json")
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+
+    sut = Prefs()
+
+    assert sut.atlas == DEFAULT_ATLAS
+    assert sut.loops == DEFAULT_LOOPS
+    assert sut.position.current is None
+
+
 def test_reads_valid_atlas(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _write_config(tmp_path, {"atlas": "orc"})
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
@@ -109,6 +122,10 @@ def test_position_defaults_to_none_on_invalid_window_object(
 
 
 def _write_config(tmp_path: Path, data: dict[str, object]) -> None:
+    _write_raw_config(tmp_path, json.dumps(data))
+
+
+def _write_raw_config(tmp_path: Path, content: str) -> None:
     cfg = tmp_path / "peon-pet" / "config.json"
     cfg.parent.mkdir(parents=True, exist_ok=True)
-    cfg.write_text(json.dumps(data))
+    cfg.write_text(content)

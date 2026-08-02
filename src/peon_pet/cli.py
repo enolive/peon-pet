@@ -54,7 +54,11 @@ def parse_args(argv: Sequence[str] | None) -> CliArgs:
         prog="peon-pet",
         description="Desktop pet that reacts to peon-ping events.",
     )
-    parser.add_argument("--anim", default=None, help="anim to play on startup")
+    parser.add_argument(
+        "--anim",
+        default=None,
+        help="anim to play on startup; takes precedence over --watch and --demo",
+    )
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument(
         "--demo",
