@@ -51,6 +51,8 @@ def main(
     try:
         app = QtWidgets.QApplication(sys.argv)
         app.setApplicationName("Peon Pet")
+        # prevent quitting on last window closed which will quit the app after the about dialog.
+        app.setQuitOnLastWindowClosed(False)
         _win = run(
             app,
             argv,
