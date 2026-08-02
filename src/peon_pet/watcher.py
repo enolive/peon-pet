@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import threading
 from collections.abc import Callable
 from pathlib import Path
 from typing import final
+
+from pydantic import BaseModel
 
 from .events import Event
 
@@ -74,36 +75,27 @@ class StateWatcher:
         last_active = self._read_last_active()
         if last_active is None:
             return
-        ts = self._ts(last_active)
+        ts = last_active.timestamp
         if ts <= self._last_timestamp:
             logger.debug("mtime changed but timestamp not newer (%.3f)", ts)
             return
         self._last_timestamp = ts
         self._emit(last_active)
 
-    def _emit(self, last_active: dict[str, object] | None) -> None:
+    def _emit(self, last_active: _LastActive | None) -> None:
         # Updates `_last_timestamp` so the next poll doesn't re-emit an older
         # event. Unknown event names or missing fields are skipped here, the
         # only place str-to-Event parsing happens.
         if last_active is None:
             return
-        self._last_timestamp = self._ts(last_active)
-        ev_name = _field(last_active, "event")
-        sid = _field(last_active, "session_id")
-        if ev_name is None:
-            return
+        self._last_timestamp = last_active.timestamp
+        ev_name = last_active.event
+        sid = last_active.session_id
         ev = Event.from_name(ev_name)
         if ev is None:
             logger.warning("unknown peon-ping event %r", ev_name)
             return
-        if sid is None:
-            return
         self.on_event(ev, sid)
-
-    @staticmethod
-    def _ts(last_active: dict[str, object]) -> float:
-        ts = last_active.get("timestamp", 0.0)
-        return float(ts) if isinstance(ts, (int, float)) else 0.0
 
     def _current_mtime(self) -> float:
         """
@@ -115,18 +107,20 @@ class StateWatcher:
         except OSError:
             return 0.0
 
-    def _read_last_active(self) -> dict[str, object] | None:
+    def _read_last_active(self) -> _LastActive | None:
         try:
-            with self.path.open() as f:
-                st = json.load(f)
+            raw_json = self.path.read_text()
+            data = _SessionState.model_validate_json(raw_json)
         except (OSError, ValueError):
             return None
-        last_active = st.get("last_active")
-        if not isinstance(last_active, dict):
-            return None
-        return last_active
+        return data.last_active
 
 
-def _field(last_active: dict[str, object], key: str) -> str | None:
-    v = last_active.get(key)
-    return v if isinstance(v, str) else None
+class _SessionState(BaseModel):
+    last_active: _LastActive
+
+
+class _LastActive(BaseModel):
+    event: str
+    session_id: str
+    timestamp: float

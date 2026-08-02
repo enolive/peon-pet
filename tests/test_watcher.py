@@ -87,7 +87,7 @@ class TestReadBoundary:
 
     def test_state_file_without_last_active_is_skipped(self, tmp_path: Path) -> None:
         state_path = tmp_path / ".state.json"
-        state_path.write_text("{}")
+        _ = state_path.write_text("{}")
         sut = WatcherDriver(state_path)
 
         sut.emit_current()
@@ -171,7 +171,21 @@ class TestPoll:
         sut = WatcherDriver(state_path)
         sut.emit_current()
         sut.seen.clear()
-        state_path.write_text("{not json")
+        _ = state_path.write_text("{not json")
+        _set_mtime(state_path, 2000.0)
+
+        sut.poll()
+
+        assert sut.seen == []
+
+    def test_skips_json_that_is_not_dict_without_crash(self, tmp_path: Path) -> None:
+        state_path = tmp_path / ".state.json"
+        _write_state_to_file(state_path, "SessionStart", "s1", 1.0)
+        _set_mtime(state_path, 1000.0)
+        sut = WatcherDriver(state_path)
+        sut.emit_current()
+        sut.seen.clear()
+        _ = state_path.write_text("42")
         _set_mtime(state_path, 2000.0)
 
         sut.poll()
@@ -193,7 +207,7 @@ class TestPoll:
 
 
 def _write_state_to_file(path: Path, event: object, sid: str | None, ts: float) -> None:
-    path.write_text(
+    _ = path.write_text(
         json.dumps(
             {"last_active": {"event": event, "session_id": sid, "timestamp": ts}}
         )

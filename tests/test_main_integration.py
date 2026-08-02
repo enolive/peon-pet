@@ -5,7 +5,6 @@ offscreen Qt, no display, and no real peon-ping.
 """
 
 import json
-from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -20,35 +19,10 @@ POLL_INTERVAL_SECONDS = 0.05
 TIMEOUT_MS = 5000
 
 
-@pytest.fixture
-def app() -> Iterator[QtWidgets.QApplication]:
-    """Yield the shared QApplication for one test, stopping that test's background
-    thread (watcher or demo) after.
-
-    The QApplication is a singleton: the first test to request this fixture
-    creates it (and `qapp`/`qtbot` reuse `QApplication.instance()` ever after), so
-    there's exactly one app for the whole session — no double-app segfault, no
-    deletion (deleting a `QApplication` that `qtbot`'s session state still
-    references crashes).
-
-    The watcher/demo run daemon threads that emit a GUI-bound signal across
-    threads; `run` stops neither on its own (in production the process exit kills
-    them; in tests they'd leak into the next test and segfault on the next `run`).
-    So the fixture stops whichever `run` stashed on the app explicitly.
-    """
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
-    assert isinstance(app, QtWidgets.QApplication)
-    yield app
-    for key in ("peon_pet_watcher", "peon_pet_demo"):
-        obj = app.property(key)
-        if obj is not None:
-            obj.stop()
-
-
 class TestWatchIntegration:
     def test_reacts_to_a_full_session_lifecycle(
         self,
-        app: QtWidgets.QApplication,
+        single_instance_app: QtWidgets.QApplication,
         qtbot: QtBot,
         tmp_path: Path,
         single_instance_server_name: str,
@@ -56,7 +30,7 @@ class TestWatchIntegration:
         state_path = tmp_path / ".state.json"
         # No pre-seeded file -> genuinely cold first event.
         win = run(
-            app,
+            single_instance_app,
             ["--watch", str(state_path)],
             single_instance_name=single_instance_server_name,
             poll_interval_s=POLL_INTERVAL_SECONDS,
@@ -76,7 +50,7 @@ class TestWatchIntegration:
 
     def test_reacts_to_a_cold_start_session(
         self,
-        app: QtWidgets.QApplication,
+        single_instance_app: QtWidgets.QApplication,
         qtbot: QtBot,
         tmp_path: Path,
         single_instance_server_name: str,
@@ -86,7 +60,7 @@ class TestWatchIntegration:
         # announces WAKING (not CELEBRATE) — the cold-start override.
         _write_state(state_path, "Stop", "s1", 1.0)
         win = run(
-            app,
+            single_instance_app,
             ["--watch", str(state_path)],
             single_instance_name=single_instance_server_name,
             poll_interval_s=POLL_INTERVAL_SECONDS,
@@ -105,13 +79,13 @@ class TestWatchIntegration:
 class TestAnimIntegration:
     def test_plays_desired_animation(
         self,
-        app: QtWidgets.QApplication,
+        single_instance_app: QtWidgets.QApplication,
         qtbot: QtBot,
         single_instance_server_name: str,
     ) -> None:
         # No pre-seeded file -> genuinely cold first event.
         win = run(
-            app,
+            single_instance_app,
             ["--anim", "annoyed"],
             single_instance_name=single_instance_server_name,
         )
@@ -123,17 +97,17 @@ class TestAnimIntegration:
 
     def test_bad_anim_raises_error(
         self,
-        app: QtWidgets.QApplication,
+        single_instance_app: QtWidgets.QApplication,
         single_instance_server_name: str,
     ) -> None:
         with pytest.raises(ValueError):
-            run(
-                app,
+            _ = run(
+                single_instance_app,
                 ["--anim", "bogus"],
                 single_instance_name=single_instance_server_name,
             )
 
-        assert PetWindow not in app.topLevelWidgets(), (
+        assert PetWindow not in single_instance_app.topLevelWidgets(), (
             "application should close instantly"
         )
 
@@ -141,16 +115,18 @@ class TestAnimIntegration:
 class TestListEvents:
     def test_list_events_and_exits_immediately(
         self,
-        app: QtWidgets.QApplication,
+        single_instance_app: QtWidgets.QApplication,
         single_instance_server_name: str,
     ) -> None:
         with pytest.raises(SystemExit) as exc:
-            run(
-                app, ["--list-events"], single_instance_name=single_instance_server_name
+            _ = run(
+                single_instance_app,
+                ["--list-events"],
+                single_instance_name=single_instance_server_name,
             )
 
         assert exc.value.code == 0
-        assert PetWindow not in app.topLevelWidgets(), (
+        assert PetWindow not in single_instance_app.topLevelWidgets(), (
             "application should close instantly"
         )
 
@@ -158,12 +134,12 @@ class TestListEvents:
 class TestDemoIntegration:
     def test_plays_demo_in_cycle(
         self,
-        app: QtWidgets.QApplication,
+        single_instance_app: QtWidgets.QApplication,
         qtbot: QtBot,
         single_instance_server_name: str,
     ) -> None:
         win = run(
-            app,
+            single_instance_app,
             ["--demo"],
             single_instance_name=single_instance_server_name,
             poll_interval_s=POLL_INTERVAL_SECONDS,
@@ -182,7 +158,7 @@ class TestDemoIntegration:
 
 
 def _write_state(path: Path, event: str, sid: str, ts: float) -> None:
-    path.write_text(
+    _ = path.write_text(
         json.dumps(
             {"last_active": {"event": event, "session_id": sid, "timestamp": ts}}
         )

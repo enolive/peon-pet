@@ -84,10 +84,10 @@ Events use the OG peon-ping/Claude hook names (`SessionStart`, `Stop`, `UserProm
 
 ## Conventions
 
-- **Types**: all public code is fully type-annotated. `uv run basedpyright` must stay at 0 warnings. The
-  `reportUnknown*` / `reportAny` rules are disabled in `pyrightconfig.json` because PyQt6's stubs type `connect()` slots
-  as `Unknown` and argparse returns `Any` - both are ecosystem limitations, not code issues. Don't add
-  `# pyright: ignore` for those; the config handles them.
+- **Types**: all public code is fully type-annotated. `uv run basedpyright` must stay at 0 warnings.
+  `reportUnknownMemberType` is disabled on some lines because PyQt6's stubs type `connect()` /
+  `addAction()` slot parameters as `Unknown`. Don't add any new suppressions without explicitly stating this so the user
+  can decide if this is acceptable.
 - **Enums**: PyQt6 requires fully-qualified enum access (`Qt.WindowType.FramelessWindowHint`, not
   `Qt.FramelessWindowHint`). Don't use the short form - it doesn't exist at runtime.
 - **Overrides**: use `@typing.override` on methods that override QWidget base methods (e.g. `paintEvent`). Don't add it

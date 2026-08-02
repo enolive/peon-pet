@@ -12,7 +12,7 @@ import logging
 import os
 import signal
 import sys
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import final
 
@@ -91,21 +91,23 @@ def run(
     win.show()
 
     tray = TrayIcon(app)
-    tray.on_toggle_visibility.connect(win.toggle_visibility)
+    _ = tray.on_toggle_visibility.connect(win.toggle_visibility)  # pyright: ignore[reportUnknownMemberType]
     tray.show()
 
     # Ctrl-C in the terminal should exit cleanly instead of being swallowed by Qt.
-    signal.signal(signal.SIGINT, lambda *_: app.quit())
+    quit_app: Callable[..., None] = lambda *_: app.quit()
+    _ = signal.signal(signal.SIGINT, quit_app)
     timer = QtCore.QTimer()
     timer.start(200)
-    timer.timeout.connect(lambda: None)
+    _ = timer.timeout.connect(lambda: None)  # pyright: ignore[reportUnknownMemberType]
 
     if args.demo:
         logger.info("demo mode")
         seam = _Seam(parent=app)
-        seam.anim_changed.connect(lambda a: win.play(a, True))
+        play: Callable[[Anim], None] = lambda a: win.play(a, True)
+        _ = seam.anim_changed.connect(play)  # pyright: ignore[reportUnknownMemberType]
         demo = Demo(on_anim_changed=seam.anim_changed.emit, interval_s=poll_interval_s)
-        app.setProperty("peon_pet_demo", demo)
+        _ = app.setProperty("peon_pet_demo", demo)
         demo.start()
     elif args.anim:
         anim = resolve_anim(args.anim)
@@ -117,17 +119,17 @@ def run(
         seam = _Seam(parent=app)
         state.on_anim_changed = seam.anim_changed.emit
         state.on_session_count_changed = seam.session_count_changed.emit
-        seam.anim_changed.connect(win.play)
-        seam.session_count_changed.connect(win.set_session_count)
-        win.finished.connect(state.on_finished)
-        tray.on_reset_to_idle.connect(state.clear)
+        _ = seam.anim_changed.connect(win.play)  # pyright: ignore[reportUnknownMemberType]
+        _ = seam.session_count_changed.connect(win.set_session_count)  # pyright: ignore[reportUnknownMemberType]
+        _ = win.finished.connect(state.on_finished)  # pyright: ignore[reportUnknownMemberType]
+        _ = tray.on_reset_to_idle.connect(state.clear)  # pyright: ignore[reportUnknownMemberType]
         watcher = StateWatcher(
             path=args.watch,
             poll_interval_s=poll_interval_s,
             on_event=state.handle_event,
         )
         # expose the watcher for testing so we can stop it after each integration test
-        app.setProperty("peon_pet_watcher", watcher)
+        _ = app.setProperty("peon_pet_watcher", watcher)
         watcher.start()
 
     return win
@@ -149,7 +151,7 @@ def claim_single_instance(app: QtWidgets.QApplication, name: str = "peon-pet") -
         sys.exit(1)
     socket.close()
     # Clear any stale socket left by a crashed previous run before we listen.
-    QtNetwork.QLocalServer.removeServer(name)
+    _ = QtNetwork.QLocalServer.removeServer(name)
     if not QtNetwork.QLocalServer(app).listen(name):
         print("ERROR: could not start single-instance server", file=sys.stderr)
         sys.exit(1)

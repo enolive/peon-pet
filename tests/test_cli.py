@@ -28,7 +28,7 @@ class TestParseArgs:
             demo=False,
             watch=None,
             list_events=False,
-            log_level=LogLevel.WARNING,
+            verbose=0,
         )
 
     def test_anim_name_is_parsed(self) -> None:
@@ -86,7 +86,7 @@ class TestResolveAnim:
 
     def test_raises_value_error_for_an_unknown_name(self) -> None:
         with pytest.raises(ValueError):
-            resolve_anim("not-an-anim")
+            _ = resolve_anim("not-an-anim")
 
 
 class TestPrintEventAnimMapping:
