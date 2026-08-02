@@ -16,7 +16,7 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import final
 
-from PyQt6 import QtCore, QtWidgets
+from PyQt6 import QtCore, QtNetwork, QtWidgets
 
 from .cli import (
     CliArgs,
@@ -142,8 +142,6 @@ def claim_single_instance(app: QtWidgets.QApplication, name: str = "peon-pet") -
     bails out. `name` is injectable so tests can claim a unique server and avoid
     colliding with each other or a real running instance.
     """
-    from PyQt6 import QtNetwork
-
     socket = QtNetwork.QLocalSocket()
     socket.connectToServer(name)
     if socket.waitForConnected(100):
