@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -15,19 +14,8 @@ from tests.assertions import wait_until
 TIMEOUT_S = 5.0
 
 
-@pytest.fixture
-def app() -> Iterator[QtWidgets.QApplication]:
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
-    assert isinstance(app, QtWidgets.QApplication)
-    yield app
-    for key in ("peon_pet_watcher", "peon_pet_demo"):
-        obj = app.property(key)
-        if obj is not None:
-            obj.stop()
-
-
 def test_vv_writes_debug_records_to_state_dir(
-    app: QtWidgets.QApplication,
+    single_instance_app: QtWidgets.QApplication,
     qtbot: QtBot,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -37,7 +25,7 @@ def test_vv_writes_debug_records_to_state_dir(
     log_path = tmp_path / DEBUG_LOG_REL
 
     win = run(
-        app,
+        single_instance_app,
         ["--anim", "annoyed", "-vv"],
         single_instance_name=single_instance_server_name,
     )

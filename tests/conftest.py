@@ -11,11 +11,12 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+from PyQt6 import QtWidgets
 
 
 def pytest_configure() -> None:
     # render Qt offscreen for test purposes
-    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    _ = os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 
 @pytest.fixture(autouse=True)
@@ -33,6 +34,33 @@ def isolated_xdg_config_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
 
 
 @pytest.fixture
+def single_instance_app() -> Iterator[QtWidgets.QApplication]:
+    """Yield the shared QApplication for one test, stopping that test's background
+    thread (watcher or demo) after.
+
+    The QApplication is a singleton: the first test to request this fixture
+    creates it (and `qapp`/`qtbot` reuse `QApplication.instance()` ever after), so
+    there's exactly one app for the whole session — no double-app segfault, no
+    deletion (deleting a `QApplication` that `qtbot`'s session state still
+    references crashes).
+
+    The watcher/demo run daemon threads that emit a GUI-bound signal across
+    threads; `run` stops neither on its own (in production the process exit kills
+    them; in tests they'd leak into the next test and segfault on the next `run`).
+    So the fixture stops whichever `run` stashed on the app explicitly.
+    """
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    assert isinstance(app, QtWidgets.QApplication)
+    yield app
+    for key in ("peon_pet_watcher", "peon_pet_demo"):
+        obj = app.property(key)  # pyright: ignore[reportAny]
+        if obj is not None:
+            # if the stop function does not exist, this will crash, which is
+            # probably better than testing the object for existence of this method
+            obj.stop()  # pyright: ignore[reportAny]
+
+
+@pytest.fixture
 def single_instance_server_name() -> Iterator[str]:
     """Yield a unique single-instance server name; remove registered local server it after the test."""
     import uuid
@@ -41,4 +69,4 @@ def single_instance_server_name() -> Iterator[str]:
 
     name = f"peon-pet-test-{uuid.uuid4().hex}"
     yield name
-    QtNetwork.QLocalServer.removeServer(name)
+    _ = QtNetwork.QLocalServer.removeServer(name)

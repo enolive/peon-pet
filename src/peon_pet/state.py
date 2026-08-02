@@ -97,7 +97,7 @@ class _SessionRegistry:
         self._sessions[session_id] = (_SessionState.ACTIVE, time.time())
 
     def _discard(self, session_id: str):
-        self._sessions.pop(session_id, None)
+        _ = self._sessions.pop(session_id, None)
 
     @property
     def count(self) -> int:

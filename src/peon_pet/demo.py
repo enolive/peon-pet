@@ -30,7 +30,7 @@ class Demo:
     ) -> None:
         self._interval = interval_s
         self._it = cycle(Anim)
-        next(self._it)  # skip SLEEPING, which the window starts on
+        _ = next(self._it)  # skip SLEEPING, which the window starts on
         self.on_anim_changed = on_anim_changed
         self._stop = threading.Event()
 

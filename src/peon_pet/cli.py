@@ -10,9 +10,10 @@ from __future__ import annotations
 import argparse
 import logging
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
+
+from pydantic import BaseModel
 
 from .config import ANIM_CONFIG, Anim
 from .events import EVENT_REACTION, Event
@@ -38,15 +39,20 @@ _STDLIB_LEVEL: Mapping[LogLevel, int] = {
 }
 
 
-@dataclass
-class CliArgs:
-    """Parsed CLI args; the seam `main` consumes."""
+class CliArgs(BaseModel):
+    anim: str | None = None
+    demo: bool = False
+    watch: Path | None = None
+    list_events: bool = False
+    verbose: int = 0
 
-    anim: str | None
-    demo: bool
-    watch: Path | None
-    list_events: bool
-    log_level: LogLevel
+    @property
+    def log_level(self) -> LogLevel:
+        if self.verbose == 0:
+            return LogLevel.WARNING
+        if self.verbose == 1:
+            return LogLevel.INFO
+        return LogLevel.DEBUG
 
 
 def parse_args(argv: Sequence[str] | None) -> CliArgs:
@@ -54,31 +60,31 @@ def parse_args(argv: Sequence[str] | None) -> CliArgs:
         prog="peon-pet",
         description="Desktop pet that reacts to peon-ping events.",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--anim",
         default=None,
         help="anim to play on startup; takes precedence over --watch and --demo",
     )
     mode = parser.add_mutually_exclusive_group()
-    mode.add_argument(
+    _ = mode.add_argument(
         "--demo",
         action="store_true",
         help="cycle through every animation every 3s (visual QA)",
     )
-    mode.add_argument(
+    _ = mode.add_argument(
         "--list-events",
         default=False,
         action="store_true",
         help="list all known events and their mappings to anims and exit",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "-v",
         "--verbose",
         action="count",
         default=0,
         help="increase log verbosity (-v info, -vv debug)",
     )
-    mode.add_argument(
+    _ = mode.add_argument(
         "--watch",
         nargs="?",
         const=str(DEFAULT_STATE_PATH),
@@ -87,21 +93,8 @@ def parse_args(argv: Sequence[str] | None) -> CliArgs:
         help=f"watch peon-ping .state.json at PATH and react to events (default: {DEFAULT_STATE_PATH})",
     )
     ns = parser.parse_args(argv)
-    # Map the -v count to a meaningful level: 0 -> WARNING, 1 -> INFO, >=2 -> DEBUG.
-    level = (
-        LogLevel.DEBUG
-        if ns.verbose >= 2
-        else LogLevel.INFO
-        if ns.verbose >= 1
-        else LogLevel.WARNING
-    )
-    return CliArgs(
-        anim=str(ns.anim) if ns.anim is not None else None,
-        demo=bool(ns.demo),
-        watch=Path(ns.watch) if ns.watch is not None else None,
-        list_events=bool(ns.list_events),
-        log_level=level,
-    )
+    cli_args = CliArgs.model_validate(vars(ns))
+    return cli_args
 
 
 def resolve_anim(arg: str) -> Anim:

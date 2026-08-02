@@ -10,10 +10,12 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 from .config import ANIM_CONFIG, ASSETS, ATLAS_LAYOUTS, Anim
 from .prefs import Prefs
 
-logger = logging.getLogger(__name__)
+_BADGE_FG_COLOR = "white"
+_BADGE_BG_COLOR = "#0c6d1a"
+_WIN_SIZE: int = 200
+_SPRITE_SIZE: int = 180  # inset like the JS (PlaneGeometry 180 in a 200 win)
 
-WIN_SIZE: int = 200
-SPRITE_SIZE: int = 180  # inset like the JS (PlaneGeometry 180 in a 200 win)
+logger = logging.getLogger(__name__)
 
 
 def cell_rect(frame: int, row: int, cell_w: float, cell_h: float) -> QtCore.QRectF:
@@ -71,7 +73,7 @@ class PetWindow(QtWidgets.QWidget):
             | QtCore.Qt.WindowType.Tool
         )
         self.setAttribute(QtCore.Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setFixedSize(WIN_SIZE, WIN_SIZE)
+        self.setFixedSize(_WIN_SIZE, _WIN_SIZE)
 
         atlas = prefs.atlas
         loops = prefs.loops
@@ -113,7 +115,7 @@ class PetWindow(QtWidgets.QWidget):
         screen = QtWidgets.QApplication.primaryScreen()
         if screen is not None:
             geo = screen.availableGeometry()
-            self.move(geo.x() + 20, geo.bottom() - WIN_SIZE - 20)
+            self.move(geo.x() + 20, geo.bottom() - _WIN_SIZE - 20)
 
     def play(self, anim: Anim, play_forever: bool = False) -> None:
         """Switch to `anim` and render it.
@@ -213,10 +215,10 @@ class PetWindow(QtWidgets.QWidget):
         p = QtGui.QPainter(self)
         p.setRenderHint(QtGui.QPainter.RenderHint.SmoothPixmapTransform, False)
 
-        sx = (WIN_SIZE - SPRITE_SIZE) // 2
-        sy = (WIN_SIZE - SPRITE_SIZE) // 2
+        sx = (_WIN_SIZE - _SPRITE_SIZE) // 2
+        sy = (_WIN_SIZE - _SPRITE_SIZE) // 2
         src = cell_rect(self.frame, self.row, self.cell_w, self.cell_h)
-        p.drawPixmap(QtCore.QRectF(sx, sy, SPRITE_SIZE, SPRITE_SIZE), self.atlas, src)
+        p.drawPixmap(QtCore.QRectF(sx, sy, _SPRITE_SIZE, _SPRITE_SIZE), self.atlas, src)
 
         p.drawPixmap(
             QtCore.QRectF(self.rect()),
@@ -233,19 +235,19 @@ class PetWindow(QtWidgets.QWidget):
         text = str(self._session_count) if self._session_count <= 9 else "9+"
         diameter = 22
         margin = 8
-        x = WIN_SIZE - diameter - margin
+        x = _WIN_SIZE - diameter - margin
         y = margin
         p.setPen(QtCore.Qt.PenStyle.NoPen)
-        p.setBrush(QtGui.QColor("#0c6d1a"))
+        p.setBrush(QtGui.QColor(_BADGE_BG_COLOR))
         p.drawEllipse(
             QtCore.QPointF(x + diameter / 2, y + diameter / 2),
             diameter / 2,
             diameter / 2,
         )
-        p.setPen(QtGui.QColor("white"))
+        p.setPen(QtGui.QColor(_BADGE_FG_COLOR))
         font = QtGui.QFont("Sans", 9, QtGui.QFont.Weight.Bold)
         p.setFont(font)
-        p.drawText(
+        _ = p.drawText(
             QtCore.QRectF(x, y, diameter, diameter),
             QtCore.Qt.AlignmentFlag.AlignCenter,
             text,
