@@ -90,10 +90,21 @@ def parse_args(argv: Sequence[str] | None) -> CliArgs:
         const=str(DEFAULT_STATE_PATH),
         default=None,
         metavar="PATH",
-        help=f"watch peon-ping .state.json at PATH and react to events (default: {DEFAULT_STATE_PATH})",
+        help=(
+            "watch peon-ping .state.json at PATH and react to events "
+            f"(default mode; PATH defaults to {DEFAULT_STATE_PATH})"
+        ),
     )
     ns = parser.parse_args(argv)
     cli_args = CliArgs.model_validate(vars(ns))
+    no_args_given = (
+        cli_args.watch is None
+        and not cli_args.demo
+        and not cli_args.list_events
+        and cli_args.anim is None
+    )
+    if no_args_given:
+        cli_args = cli_args.model_copy(update={"watch": DEFAULT_STATE_PATH})
     return cli_args
 
 

@@ -22,13 +22,13 @@ A friendly companion to [PeonPing](https://www.peonping.com/). Will read its sta
 > have no agent-agnostic way to reliably identify them all.
 > If you start the pet, it will try to detect any already started sessions, but that might not be always accurate.
 > It will also try to catch up on any activity.
-> If you believe the number of active sessions is totally of, you can reset them via the Tray Control.
+> If you believe the number of active sessions is totally off, you can reset them via the Tray Control.
 
 ## Installation
 
 Requirements:
 
-* [uv]([https://github.com/uvloop/uvloop](https://docs.astral.sh/uv/)): Package manager
+* [uv](https://docs.astral.sh/uv/): Package manager
 * [Python 3](https://www.python.org/): uv will try to bootstrap it if not present
 
 ```bash
@@ -41,9 +41,9 @@ your app menu.
 ## Usage
 
 ```bash
-# starts the pet in the watch mode. Will read its state from `~/.claude/hooks/peon-ping/.state.json'
-peon-pet --watch
-# starts the pet in the watch mode with a custom state path
+# watch mode is the default; reads ~/.claude/hooks/peon-ping/.state.json
+peon-pet
+# same, with an explicit custom state path
 peon-pet --watch path/to/.state.json
 # list all available options
 peon-pet --help
