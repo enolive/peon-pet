@@ -16,7 +16,7 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import final
 
-from PyQt6 import QtCore, QtNetwork, QtWidgets
+from PySide6 import QtCore, QtNetwork, QtWidgets
 
 from .cli import (
     CliArgs,
@@ -91,7 +91,7 @@ def run(
     win.show()
 
     tray = TrayIcon(app)
-    _ = tray.on_toggle_visibility.connect(win.toggle_visibility)  # pyright: ignore[reportUnknownMemberType]
+    _ = tray.on_toggle_visibility.connect(win.toggle_visibility)
     tray.show()
 
     # Ctrl-C in the terminal should exit cleanly instead of being swallowed by Qt.
@@ -99,13 +99,13 @@ def run(
     _ = signal.signal(signal.SIGINT, quit_app)
     timer = QtCore.QTimer()
     timer.start(200)
-    _ = timer.timeout.connect(lambda: None)  # pyright: ignore[reportUnknownMemberType]
+    _ = timer.timeout.connect(lambda: None)
 
     if args.demo:
         logger.info("demo mode")
         seam = _Seam(parent=app)
         play: Callable[[Anim], None] = lambda a: win.play(a, True)
-        _ = seam.anim_changed.connect(play)  # pyright: ignore[reportUnknownMemberType]
+        _ = seam.anim_changed.connect(play)
         demo = Demo(on_anim_changed=seam.anim_changed.emit, interval_s=poll_interval_s)
         _ = app.setProperty("peon_pet_demo", demo)
         demo.start()
@@ -119,10 +119,10 @@ def run(
         seam = _Seam(parent=app)
         state.on_anim_changed = seam.anim_changed.emit
         state.on_session_count_changed = seam.session_count_changed.emit
-        _ = seam.anim_changed.connect(win.play)  # pyright: ignore[reportUnknownMemberType]
-        _ = seam.session_count_changed.connect(win.set_session_count)  # pyright: ignore[reportUnknownMemberType]
-        _ = win.finished.connect(state.on_finished)  # pyright: ignore[reportUnknownMemberType]
-        _ = tray.on_reset_to_idle.connect(state.clear)  # pyright: ignore[reportUnknownMemberType]
+        _ = seam.anim_changed.connect(win.play)
+        _ = seam.session_count_changed.connect(win.set_session_count)
+        _ = win.finished.connect(state.on_finished)
+        _ = tray.on_reset_to_idle.connect(state.clear)
         watcher = StateWatcher(
             path=args.watch,
             poll_interval_s=poll_interval_s,
@@ -190,8 +190,8 @@ class _Seam(QtCore.QObject):
     thread).
     """
 
-    anim_changed = QtCore.pyqtSignal(Anim)
-    session_count_changed = QtCore.pyqtSignal(int)
+    anim_changed = QtCore.Signal(Anim)
+    session_count_changed = QtCore.Signal(int)
 
 
 if __name__ == "__main__":

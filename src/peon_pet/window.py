@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import final, override
 
-from PyQt6 import QtCore, QtGui, QtWidgets
+from PySide6 import QtCore, QtGui, QtWidgets
 
 from .config import ANIM_CONFIG, ASSETS, ATLAS_LAYOUTS, Anim
 from .prefs import Prefs
@@ -59,7 +59,7 @@ class PetWindow(QtWidgets.QWidget):
 
     # Emitted when a one-shot anim has played `loops` times. The state machine
     # reacts to this by switching to the base anim.
-    finished = QtCore.pyqtSignal()
+    finished = QtCore.Signal()
 
     def __init__(
         self,
@@ -97,7 +97,7 @@ class PetWindow(QtWidgets.QWidget):
         self._drag_offset = None
         self._session_count = 0
         self.timer = QtCore.QTimer(self)
-        _ = self.timer.timeout.connect(self.advance)  # pyright: ignore[reportUnknownMemberType]
+        _ = self.timer.timeout.connect(self.advance)
         self.play(start_anim)
 
         # Position: saved overrides the default bottom-left corner.
@@ -113,9 +113,8 @@ class PetWindow(QtWidgets.QWidget):
 
     def _move_default(self) -> None:
         screen = QtWidgets.QApplication.primaryScreen()
-        if screen is not None:
-            geo = screen.availableGeometry()
-            self.move(geo.x() + 20, geo.bottom() - _WIN_SIZE - 20)
+        geo = screen.availableGeometry()
+        self.move(geo.x() + 20, geo.bottom() - _WIN_SIZE - 20)
 
     def play(self, anim: Anim, play_forever: bool = False) -> None:
         """Switch to `anim` and render it.
@@ -182,36 +181,35 @@ class PetWindow(QtWidgets.QWidget):
         self.update()
 
     @override
-    def mousePressEvent(self, a0: QtGui.QMouseEvent | None) -> None:
-        if a0 is not None and a0.button() == QtCore.Qt.MouseButton.LeftButton:
+    def mousePressEvent(self, event: QtGui.QMouseEvent) -> None:
+        if event.button() == QtCore.Qt.MouseButton.LeftButton:
             self._drag_offset = (
-                a0.globalPosition().toPoint() - self.frameGeometry().topLeft()
+                event.globalPosition().toPoint() - self.frameGeometry().topLeft()
             )
-            a0.accept()
+            event.accept()
 
     @override
-    def mouseMoveEvent(self, a0: QtGui.QMouseEvent | None) -> None:
+    def mouseMoveEvent(self, event: QtGui.QMouseEvent) -> None:
         if (
-            a0 is not None
-            and self._drag_offset is not None
-            and a0.buttons() & QtCore.Qt.MouseButton.LeftButton
+            self._drag_offset is not None
+            and event.buttons() & QtCore.Qt.MouseButton.LeftButton
         ):
-            self.move(a0.globalPosition().toPoint() - self._drag_offset)
-            a0.accept()
+            self.move(event.globalPosition().toPoint() - self._drag_offset)
+            event.accept()
 
     @override
-    def mouseReleaseEvent(self, a0: QtGui.QMouseEvent | None) -> None:
+    def mouseReleaseEvent(self, event: QtGui.QMouseEvent) -> None:
         if (
-            a0 is not None
-            and a0.button() == QtCore.Qt.MouseButton.LeftButton
+            event.button() == QtCore.Qt.MouseButton.LeftButton
             and self._drag_offset is not None
         ):
             self._drag_offset = None
             self._prefs.position.save((self.pos().x(), self.pos().y()))
-            a0.accept()
+            event.accept()
 
     @override
-    def paintEvent(self, a0: QtGui.QPaintEvent | None) -> None:
+    def paintEvent(self, event: QtGui.QPaintEvent) -> None:
+        _ = event
         p = QtGui.QPainter(self)
         p.setRenderHint(QtGui.QPainter.RenderHint.SmoothPixmapTransform, False)
 

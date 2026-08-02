@@ -2,7 +2,7 @@
 
 ## Overview
 
-A desktop pet that reacts to peon-ping events. Python + PyQt6.
+A desktop pet that reacts to peon-ping events. Python + PySide6.
 
 ## Working style
 
@@ -33,7 +33,7 @@ A desktop pet that reacts to peon-ping events. Python + PyQt6.
 
 ## Tech stack
 
-- **Python >= 3.10** with **PyQt6** for the GUI (frameless transparent always-on-top window)
+- **Python >= 3.10** with **PySide6** for the GUI (frameless transparent always-on-top window)
 - **uv** for project/env management (`pyproject.toml`, `uv.lock`, `.venv/`)
 - **hatchling** build backend; produces an installable wheel
 - **basedpyright** for type checking (also the LSP Zed uses)
@@ -84,12 +84,11 @@ Events use the OG peon-ping/Claude hook names (`SessionStart`, `Stop`, `UserProm
 
 ## Conventions
 
-- **Types**: all public code is fully type-annotated. `uv run basedpyright` must stay at 0 warnings.
-  `reportUnknownMemberType` is disabled on some lines because PyQt6's stubs type `connect()` /
-  `addAction()` slot parameters as `Unknown`. Don't add any new suppressions without explicitly stating this so the user
-  can decide if this is acceptable.
-- **Enums**: PyQt6 requires fully-qualified enum access (`Qt.WindowType.FramelessWindowHint`, not
+- **Types**: all public code is fully type-annotated. `uv run basedpyright` must stay at 0 warnings. Don't add any new
+  pyright suppressions silently. Instead, state this to the user and ask for review and consent.
+- **Enums**: PySide6 requires fully-qualified enum access (`Qt.WindowType.FramelessWindowHint`, not
   `Qt.FramelessWindowHint`). Don't use the short form - it doesn't exist at runtime.
+- **Signals**: use `QtCore.Signal` (not PyQt's `pyqtSignal`).
 - **Overrides**: use `@typing.override` on methods that override QWidget base methods (e.g. `paintEvent`). Don't add it
   to our own methods like `advance`.
 - **Assets**: use `importlib.resources` (`files(__package__) / "assets"`) - never `__file__`-relative paths. The latter
