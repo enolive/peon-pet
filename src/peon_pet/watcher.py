@@ -22,10 +22,6 @@ OnEvent = Callable[[Event, str], None]
 OnTick = Callable[[], None]
 
 
-def _noop() -> None:
-    pass
-
-
 @final
 class StateWatcher:
     """The on_event callback fires on the daemon thread, so callers crossing
@@ -62,12 +58,12 @@ class StateWatcher:
         logger.debug("started, polling %s", self.path)
 
     def stop(self, timeout_s: float = 2.0) -> None:
+        logger.debug("stop requested")
         self._stop.set()
         thread = self._thread
         if thread is not None:
             thread.join(timeout_s)
             self._thread = None
-        logger.debug("stop requested")
 
     def _run(self) -> None:
         # Emits the current event first so consumers sync to current reality,
@@ -142,3 +138,7 @@ class _LastActive(BaseModel):
     event: str
     session_id: str
     timestamp: float
+
+
+def _noop(*_a: object) -> None:
+    pass

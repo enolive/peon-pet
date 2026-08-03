@@ -39,24 +39,6 @@ def missing_anims(rows: int) -> list[Anim]:
 
 @final
 class PetWindow(QtWidgets.QWidget):
-    # Class-level type declarations (assigned in __init__).
-    atlas: QtGui.QPixmap
-    border: QtGui.QPixmap
-    cell_w: float
-    cell_h: float
-    loops: int
-    _rows: int
-    anim: Anim
-    row: int
-    max_frames: int
-    loop: bool
-    frame: int
-    _loops_played: int
-    timer: QtCore.QTimer
-    _drag_offset: QtCore.QPoint | None
-    _session_count: int
-    _prefs: Prefs
-
     # Emitted when a one-shot anim has played `loops` times. The state machine
     # reacts to this by switching to the base anim.
     finished = QtCore.Signal()
@@ -78,26 +60,27 @@ class PetWindow(QtWidgets.QWidget):
         atlas = prefs.atlas
         loops = prefs.loops
         layout = ATLAS_LAYOUTS[atlas]
-        self.atlas = QtGui.QPixmap(str(ASSETS / layout.filename))
-        if self.atlas.isNull():
+        self._atlas = QtGui.QPixmap(str(ASSETS / layout.filename))
+        if self._atlas.isNull():
             raise RuntimeError(f"failed to load atlas: {layout.filename}")
         border = QtGui.QPixmap(str(ASSETS / layout.border))
         if border.isNull():
             raise RuntimeError(f"failed to load border: {layout.border}")
-        self.border = border
-        self.cell_w = self.atlas.width() / layout.cols
-        self.cell_h = self.atlas.height() / layout.rows
-        self.loops = loops
+        self._border = border
+        self._cell_w = self._atlas.width() / layout.cols
+        self._cell_h = self._atlas.height() / layout.rows
+        self._loops = loops
+        self._anim: Anim | None = None
+        self._loop: bool | None = None
         self._rows = layout.rows
         self._prefs = prefs
         self._warn_missing_anims(atlas)
-
-        self.frame = 0
+        self._frame = 0
         self._loops_played = 0
-        self._drag_offset = None
+        self._drag_offset: QtCore.QPoint | None = None
         self._session_count = 0
-        self.timer = QtCore.QTimer(self)
-        _ = self.timer.timeout.connect(self.advance)
+        self._timer = QtCore.QTimer(self)
+        _ = self._timer.timeout.connect(self.advance)
         self.play(start_anim)
 
         # Position: saved overrides the default bottom-left corner.
@@ -110,6 +93,22 @@ class PetWindow(QtWidgets.QWidget):
                 self._move_default()
         else:
             self._move_default()
+
+    @property
+    def anim(self) -> Anim | None:
+        return self._anim
+
+    @property
+    def loops(self) -> int:
+        return self._loops
+
+    @property
+    def loop(self) -> bool | None:
+        return self._loop
+
+    @property
+    def frame(self) -> int:
+        return self._frame
 
     def _move_default(self) -> None:
         screen = QtWidgets.QApplication.primaryScreen()
@@ -126,18 +125,18 @@ class PetWindow(QtWidgets.QWidget):
         """
         cfg = ANIM_CONFIG[anim]
         loop = True if play_forever else cfg.loop
-        if getattr(self, "anim", None) is anim and getattr(self, "loop", None) is loop:
+        if self._anim is anim and self._loop is loop:
             return
         logger.debug("play %s%s", anim.value, " (forever)" if play_forever else "")
-        self.anim = anim
-        self.row = min(cfg.row, self._rows - 1)
-        self.max_frames = cfg.frames
-        self.loop = loop
-        self.frame = 0
+        self._anim = anim
+        self._row = min(cfg.row, self._rows - 1)
+        self._max_frames = cfg.frames
+        self._loop = loop
+        self._frame = 0
         self._loops_played = 0
-        self.timer.setInterval(int(1000 / cfg.fps))
-        if not self.timer.isActive():
-            self.timer.start()
+        self._timer.setInterval(int(1000 / cfg.fps))
+        if not self._timer.isActive():
+            self._timer.start()
 
     def _warn_missing_anims(self, atlas: str) -> None:
         missing = missing_anims(self._rows)
@@ -153,21 +152,21 @@ class PetWindow(QtWidgets.QWidget):
         )
 
     def advance(self) -> None:
-        self.frame += 1
-        if self.frame >= self.max_frames:
-            if self.loop:
-                self.frame = 0
+        self._frame += 1
+        if self._frame >= self._max_frames:
+            if self._loop:
+                self._frame = 0
             else:
                 self._loops_played += 1
-                if self._loops_played >= self.loops:
+                if self._loops_played >= self._loops:
                     # Reaction played out - hold the last frame as a fallback.
                     # In practice the synchronous finished -> state -> play(base)
                     # chain switches at this loop boundary without a freeze.
-                    self.frame = self.max_frames - 1
+                    self._frame = self._max_frames - 1
                     self.finished.emit()
                     self.update()
                     return
-                self.frame = 0
+                self._frame = 0
         self.update()
 
     def toggle_visibility(self) -> None:
@@ -215,13 +214,15 @@ class PetWindow(QtWidgets.QWidget):
 
         sx = (_WIN_SIZE - _SPRITE_SIZE) // 2
         sy = (_WIN_SIZE - _SPRITE_SIZE) // 2
-        src = cell_rect(self.frame, self.row, self.cell_w, self.cell_h)
-        p.drawPixmap(QtCore.QRectF(sx, sy, _SPRITE_SIZE, _SPRITE_SIZE), self.atlas, src)
+        src = cell_rect(self._frame, self._row, self._cell_w, self._cell_h)
+        p.drawPixmap(
+            QtCore.QRectF(sx, sy, _SPRITE_SIZE, _SPRITE_SIZE), self._atlas, src
+        )
 
         p.drawPixmap(
             QtCore.QRectF(self.rect()),
-            self.border,
-            QtCore.QRectF(0, 0, self.border.width(), self.border.height()),
+            self._border,
+            QtCore.QRectF(0, 0, self._border.width(), self._border.height()),
         )
 
         # Badge last so it sits on top.

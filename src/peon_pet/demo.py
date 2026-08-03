@@ -16,7 +16,7 @@ from typing import final
 
 from .config import Anim
 
-DEFAULT_INTERVAL_S = 3.0
+_DEFAULT_INTERVAL_S = 3.0
 
 OnAnim = Callable[[Anim], None]
 
@@ -26,8 +26,9 @@ class Demo:
     def __init__(
         self,
         on_anim_changed: OnAnim,
-        interval_s: float = DEFAULT_INTERVAL_S,
+        interval_s: float = _DEFAULT_INTERVAL_S,
     ) -> None:
+        self._thread: threading.Thread | None = None
         self._interval = interval_s
         self._it = cycle(Anim)
         _ = next(self._it)  # skip SLEEPING, which the window starts on
@@ -38,9 +39,14 @@ class Demo:
         self._stop.clear()
         thread = threading.Thread(target=self._run, daemon=True)
         thread.start()
+        self._thread = thread
 
-    def stop(self) -> None:
+    def stop(self, timeout_s: float = 2.0) -> None:
         self._stop.set()
+        thread = self._thread
+        if thread is not None:
+            thread.join(timeout_s)
+            self._thread = None
 
     def _run(self) -> None:
         # Emit the first anim immediately so the demo starts without waiting

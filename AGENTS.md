@@ -85,6 +85,9 @@ Events use the OG peon-ping/Claude hook names (`SessionStart`, `Stop`, `UserProm
   breaks after `pip install`.
 - **File layout**: organize files top-down. The primary entry point / public function goes at the top; helpers and data
   classes go below it. Put `if __name__ == "__main__"` at the very bottom of the file, never between functions.
+- **WET over premature DRY**: prefer a second local copy over a shared helper until a third real call site (or a clear
+  shared owner) appears. Tiny utilities (`_noop`, one-line adapters) stay module-private. When you do duplicate, keep
+  signatures aligned so extraction later is mechanical, not a redesign.
 - **ASCII only**: avoid Unicode symbols like arrows (`->`), checkmarks, em dashes (`—`), ellipses (`…`), etc. in code
   and comments - use plain ASCII (`-`, `->`, `=>`, `...`, words) instead. They don't render reliably across
   terminals/editors and are hard to type.

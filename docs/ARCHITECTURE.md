@@ -57,10 +57,10 @@ of known sessions, each IDLE or ACTIVE, and translates peon-ping events into a t
 session announces `WAKING` (regardless of its own reaction) so a cold `Stop` doesn't spuriously celebrate. A cold
 `SessionEnd` (nothing to wake) falls through to base.
 
-**Session TTL:** each session stores `last_seen` (refreshed on every event for that id). Entries with
-`now - last_seen > SESSION_MAX_AGE_S` (30 minutes, strict `>`) are dropped by `PetStateMachine.purge_expired()`, the
-watcher's `on_tick` target (runs after each poll, including when the file did not change). If purge changes the badge
-count, `on_session_count_changed` fires; if it changes `base_anim`, `on_anim_changed` fires too.
+**Session TTL:** each session stores `last_seen` (refreshed on every event for that id). Entries with after a max idle
+age are dropped by `PetStateMachine.purge_expired()`, the watcher's `on_tick` target (runs after each poll, including
+when the file did not change). If purge changes the badge count,
+`on_session_count_changed` fires; if it changes `base_anim`, `on_anim_changed` fires too.
 
 ## The state watcher
 

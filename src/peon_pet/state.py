@@ -6,7 +6,7 @@ any session is ACTIVE, else SLEEPING, so after a Stop the pet sleeps even while
 the session is still open; the badge (session count) disambiguates "no session"
 from "idle-but-present".
 
-Sessions without events for longer than SESSION_MAX_AGE_S are dropped via
+Sessions without events for longer than _SESSION_MAX_AGE_S are dropped via
 purge_expired on the watcher tick.
 """
 
@@ -23,9 +23,6 @@ from .config import Anim
 from .events import EVENT_REACTION, Event
 
 logger = logging.getLogger(__name__)
-
-# Drop a session when now - last_seen > this (strict). 30 minutes.
-SESSION_MAX_AGE_S: float = 30 * 60
 
 
 class _SessionState(enum.Enum):
@@ -55,6 +52,84 @@ _TASK_IDLE_EVENTS: frozenset[Event] = frozenset({Event.STOP})
 
 # Events that end a session (-> removed from registry). Only SessionEnd.
 _SESSION_END_EVENTS: frozenset[Event] = frozenset({Event.SESSION_END})
+
+# Drop a session when now - last_seen > this (strict).
+_SESSION_MAX_AGE_S: float = 15 * 60
+
+
+@final
+class PetStateMachine:
+    def __init__(
+        self,
+        *,
+        max_age_s: float = _SESSION_MAX_AGE_S,
+        clock: Callable[[], float] = time.time,
+    ) -> None:
+        self._sessions = _SessionRegistry(max_age_s=max_age_s, clock=clock)
+        self.on_anim_changed: Callable[[Anim], None] = _noop
+        self.on_session_count_changed: Callable[[int], None] = _noop
+
+    @property
+    def session_active(self) -> bool:
+        return self._sessions.count > 0
+
+    @property
+    def session_ids(self) -> frozenset[str]:
+        return self._sessions.session_ids
+
+    @property
+    def base_anim(self) -> Anim:
+        return Anim.TYPING if self._sessions.any_active else Anim.SLEEPING
+
+    def handle_event(self, event: Event, session_id: str) -> None:
+        cold_start, added, count = self._sessions.apply(event, session_id)
+        if cold_start and added:
+            # Cold start: the watcher replayed the last peon-ping event on an
+            # unknown session. Override the reaction to WAKING so a cold Stop
+            # doesn't spuriously celebrate and a cold working event doesn't skip
+            # the wake. A cold SessionEnd (nothing to wake) settles to base.
+            anim = Anim.WAKING
+        else:
+            anim = self.resolve_anim(event)
+
+        logger.debug(
+            "event=%s sid=%s cold=%s -> anim=%s count=%d",
+            event,
+            session_id,
+            cold_start,
+            anim,
+            count,
+        )
+
+        self.on_anim_changed(anim)
+        self.on_session_count_changed(count)
+
+    def resolve_anim(self, event: Event) -> Anim:
+        reaction = EVENT_REACTION.get(event)
+        anim = self.base_anim if reaction is None else reaction
+        return anim
+
+    def on_finished(self) -> None:
+        self.on_anim_changed(self.base_anim)
+
+    def purge_expired(self) -> None:
+        """Drop sessions past max age. Watcher on_tick target."""
+        before_base = self.base_anim
+        before_count = self._sessions.count
+        if not self._sessions.purge_expired():
+            return
+        after_count = self._sessions.count
+        logger.debug(
+            f"purged expired sessions before={before_count} after={after_count}."
+        )
+        self.on_session_count_changed(after_count)
+        if self.base_anim is not before_base:
+            self.on_anim_changed(self.base_anim)
+
+    def clear(self) -> None:
+        if self._sessions.clear():
+            self.on_anim_changed(self.base_anim)
+        self.on_session_count_changed(self._sessions.count)
 
 
 @final
@@ -148,81 +223,6 @@ class _SessionRegistry:
             had_any = bool(self._sessions)
             self._sessions.clear()
             return had_any
-
-
-@final
-class PetStateMachine:
-    def __init__(
-        self,
-        *,
-        max_age_s: float = SESSION_MAX_AGE_S,
-        clock: Callable[[], float] = time.time,
-    ) -> None:
-        self._sessions = _SessionRegistry(max_age_s=max_age_s, clock=clock)
-        self.on_anim_changed: Callable[[Anim], None] = _noop
-        self.on_session_count_changed: Callable[[int], None] = _noop
-
-    @property
-    def session_active(self) -> bool:
-        return self._sessions.count > 0
-
-    @property
-    def session_ids(self) -> frozenset[str]:
-        return self._sessions.session_ids
-
-    @property
-    def base_anim(self) -> Anim:
-        return Anim.TYPING if self._sessions.any_active else Anim.SLEEPING
-
-    def handle_event(self, event: Event, session_id: str) -> None:
-        cold_start, added, count = self._sessions.apply(event, session_id)
-        if cold_start and added:
-            # Cold start: the watcher replayed the last peon-ping event on an
-            # unknown session. Override the reaction to WAKING so a cold Stop
-            # doesn't spuriously celebrate and a cold working event doesn't skip
-            # the wake. A cold SessionEnd (nothing to wake) settles to base.
-            anim = Anim.WAKING
-        else:
-            anim = self.resolve_anim(event)
-
-        logger.debug(
-            "event=%s sid=%s cold=%s -> anim=%s count=%d",
-            event,
-            session_id,
-            cold_start,
-            anim,
-            count,
-        )
-
-        self.on_anim_changed(anim)
-        self.on_session_count_changed(count)
-
-    def resolve_anim(self, event: Event) -> Anim:
-        reaction = EVENT_REACTION.get(event)
-        anim = self.base_anim if reaction is None else reaction
-        return anim
-
-    def on_finished(self) -> None:
-        self.on_anim_changed(self.base_anim)
-
-    def purge_expired(self) -> None:
-        """Drop sessions past max age. Watcher on_tick target."""
-        before_base = self.base_anim
-        before_count = self._sessions.count
-        if not self._sessions.purge_expired():
-            return
-        after_count = self._sessions.count
-        logger.debug(
-            f"purged expired sessions before={before_count} after={after_count}."
-        )
-        self.on_session_count_changed(after_count)
-        if self.base_anim is not before_base:
-            self.on_anim_changed(self.base_anim)
-
-    def clear(self) -> None:
-        if self._sessions.clear():
-            self.on_anim_changed(self.base_anim)
-        self.on_session_count_changed(self._sessions.count)
 
 
 def _noop(*_a: object) -> None:
