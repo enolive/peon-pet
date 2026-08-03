@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 # Callback shape: (event, session_id).
 OnEvent = Callable[[Event, str], None]
+OnTick = Callable[[], None]
 
 
 @final
@@ -26,16 +27,23 @@ class StateWatcher:
     """The on_event callback fires on the daemon thread, so callers crossing
     into a GUI thread must marshal themselves (see __main__'s seam). peon-ping
     writes .state.json atomically (tempfile + os.replace), which breaks
-    QFileSystemWatcher's inode watch, hence mtime polling."""
+    QFileSystemWatcher's inode watch, hence mtime polling.
+
+    After each poll wait, `on_tick` runs (even when the file did not change) so
+    consumers can expire stale state. It is not called during the initial
+    `_emit_current` sync. `stop` joins the poll thread.
+    """
 
     def __init__(
         self,
         on_event: OnEvent,
         path: Path = DEFAULT_STATE_PATH,
         poll_interval_s: float = POLL_INTERVAL_S,
+        on_tick: OnTick | None = None,
     ) -> None:
         self.path = path
         self.on_event: OnEvent = on_event
+        self.on_tick: OnTick = on_tick if on_tick is not None else _noop
         self._poll_interval_s = poll_interval_s
         self._last_mtime: float = 0.0
         """keeps track of the last modification time of the state file"""
@@ -49,17 +57,23 @@ class StateWatcher:
         self._thread.start()
         logger.debug("started, polling %s", self.path)
 
-    def stop(self) -> None:
-        self._stop.set()
+    def stop(self, timeout_s: float = 2.0) -> None:
         logger.debug("stop requested")
+        self._stop.set()
+        thread = self._thread
+        if thread is not None:
+            thread.join(timeout_s)
+            self._thread = None
 
     def _run(self) -> None:
         # Emits the current event first so consumers sync to current reality,
-        # then polls for changes.
+        # then polls for changes. on_tick runs only after each wait, not on the
+        # initial emit.
         logger.debug("polling thread running")
         self._emit_current()
         while not self._stop.wait(self._poll_interval_s):
             self._poll()
+            self.on_tick()
         logger.debug("polling thread exiting")
 
     def _emit_current(self) -> None:
@@ -124,3 +138,7 @@ class _LastActive(BaseModel):
     event: str
     session_id: str
     timestamp: float
+
+
+def _noop(*_a: object) -> None:
+    pass

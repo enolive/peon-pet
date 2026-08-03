@@ -4,6 +4,8 @@ import json
 import os
 import time
 from pathlib import Path
+from types import TracebackType
+from typing import Self
 
 from peon_pet.events import Event
 from peon_pet.watcher import StateWatcher
@@ -14,8 +16,7 @@ class TestThread:
     def test_start_emits_current_then_polls_new_events(self, tmp_path: Path) -> None:
         state_path = tmp_path / ".state.json"
         _write_state_to_file(state_path, "SessionStart", "s1", 1.0)
-        sut = WatcherDriver(path=state_path, poll_interval_s=0.05)
-        try:
+        with WatcherDriver(path=state_path, poll_interval_s=0.05) as sut:
             sut.start()
             assert wait_until(lambda: sut.seen == [(Event.SESSION_START, "s1")])
 
@@ -27,8 +28,6 @@ class TestThread:
                     == [(Event.SESSION_START, "s1"), (Event.USER_PROMPT_SUBMIT, "s1")]
                 )
             )
-        finally:
-            sut.stop()
 
     def test_stop_halts_consumption(self, tmp_path: Path) -> None:
         state_path = tmp_path / ".state.json"
@@ -40,12 +39,60 @@ class TestThread:
         sut.stop()
         _write_state_to_file(state_path, "UserPromptSubmit", "s1", 2.0)
 
-        # After stop, a few poll intervals pass with no new emit — the thread has
-        # exited its loop. A short sleep (not _wait_until) is right here: we're
-        # asserting the *absence* of a change, so we must give it time to (not)
-        # happen, then check it didn't.
+        # wait a few cycles to assure no more events are emitted
         time.sleep(0.2)
         assert sut.seen == [(Event.SESSION_START, "s1")]
+
+
+class TestTick:
+    def test_tick_fires_on_each_poll_interval_without_state_change(
+        self, tmp_path: Path
+    ) -> None:
+        state_path = tmp_path / ".state.json"
+        with WatcherDriver(path=state_path, poll_interval_s=0.05) as sut:
+            sut.start()
+
+            assert wait_until(lambda: sut.ticks >= 2)
+
+    def test_tick_fires_even_when_events_also_fire(self, tmp_path: Path) -> None:
+        state_path = tmp_path / ".state.json"
+        _write_state_to_file(state_path, "SessionStart", "s1", 1.0)
+        with WatcherDriver(path=state_path, poll_interval_s=0.05) as sut:
+            sut.start()
+            assert wait_until(lambda: sut.seen == [(Event.SESSION_START, "s1")])
+
+            _write_state_to_file(state_path, "UserPromptSubmit", "s1", 2.0)
+
+            assert wait_until(
+                lambda: (
+                    Event.USER_PROMPT_SUBMIT in {e for e, _ in sut.seen}
+                    and sut.ticks >= 1
+                )
+            )
+
+    def test_stop_halts_any_further_ticks(self, tmp_path: Path) -> None:
+        state_path = tmp_path / ".state.json"
+        sut = WatcherDriver(path=state_path, poll_interval_s=0.05)
+        sut.start()
+        assert wait_until(lambda: sut.ticks >= 1)
+
+        sut.stop()
+        frozen = sut.ticks
+        # wait a few cycles to ensure no more ticks are emitted
+        time.sleep(0.2)
+
+        assert sut.ticks == frozen
+
+    def test_tick_not_called_during_initial_emit(self, tmp_path: Path) -> None:
+        state_path = tmp_path / ".state.json"
+        _write_state_to_file(state_path, "SessionStart", "s1", 1.0)
+        with WatcherDriver(path=state_path, poll_interval_s=1.0) as sut:
+            sut.start()
+            assert wait_until(lambda: sut.seen == [(Event.SESSION_START, "s1")])
+
+            time.sleep(0.1)
+
+            assert sut.ticks == 0
 
 
 class TestReadBoundary:
@@ -219,31 +266,45 @@ def _set_mtime(path: Path, mtime: float) -> None:
 
 
 class WatcherDriver:
-    """Drives a StateWatcher's polling steps synchronously, without its thread.
+    """Drives a StateWatcher.
 
-    StateWatcher's public API is `start()` / `stop()` — a daemon thread that
-    polls every POLL_INTERVAL_S. Driving that in tests means sleeping and
-    racing the scheduler: flaky and slow, and it tests the threading wrapper
-    rather than the logic with real bugs.
+    Thread-level tests (TestThread, TestWatcherTick) use start/stop on the same
+    driver and record `on_tick` via `ticks`.
 
-    Instead we drive the two synchronous steps the thread performs — the
-    initial sync (`_emit_current`) and one poll tick (`_poll`) — directly.
-    These are private methods, so this is deliberately testing internal API:
-    the mtime/timestamp suppression logic is the whole point and has no other
-    entry point. Centralizing the calls here keeps the internal-API use to a
-    single seam (this class) rather than scattering `w._poll()` / `_emit_current()`
-    across every test, which made the smell pervasive and unreviewable.
+    Other tests are using its internal api via poll/emit_current in order to be able
+    to test its behavior synchronously.
+
+    Implements a context manager to stop the watcher after its usage and get rid of
+    weird try finally blocks for stopping it.
     """
 
     _watcher: StateWatcher
 
+    ticks: int
+
     def __init__(self, path: Path, poll_interval_s: float = 0.05) -> None:
         self.seen: list[tuple[Event, str]] = []
+        self.ticks = 0
         self._watcher = StateWatcher(
             path=path,
             on_event=lambda e, s: self.seen.append((e, s)),
+            on_tick=self._on_tick,
             poll_interval_s=poll_interval_s,
         )
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(
+        self,
+        type_: type[BaseException] | None,
+        value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        self.stop()
+
+    def _on_tick(self) -> None:
+        self.ticks += 1
 
     def start(self) -> None:
         self._watcher.start()

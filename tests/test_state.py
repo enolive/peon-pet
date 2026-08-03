@@ -1,5 +1,6 @@
 """Tests for PetStateMachine's typed event handling."""
 
+from collections.abc import Callable
 from typing import ClassVar
 
 import pytest
@@ -7,6 +8,137 @@ import pytest
 from peon_pet.config import Anim
 from peon_pet.events import EVENT_REACTION, Event
 from peon_pet.state import PetStateMachine
+
+
+class TestPurgeExpired:
+    def test_session_alive_at_exact_max_age(self) -> None:
+        clock = _FakeClock(0.0)
+        sm, anims, counts = _wire_state_machine_with_recording_callbacks(
+            max_age_s=10.0, clock=clock
+        )
+        sm.handle_event(Event.SESSION_START, "s1")
+        anims.clear()
+        counts.clear()
+        clock.t = 10.0
+
+        sm.purge_expired()
+
+        assert sm.session_active
+        assert anims == []
+        assert counts == []
+        assert sm.session_ids == frozenset({"s1"})
+
+    def test_session_expired_past_max_age(self) -> None:
+        clock = _FakeClock(0.0)
+        sm, anims, counts = _wire_state_machine_with_recording_callbacks(
+            max_age_s=10.0, clock=clock
+        )
+        sm.handle_event(Event.SESSION_START, "s1")
+        sm.handle_event(Event.SESSION_START, "s2")
+        sm.handle_event(Event.SESSION_START, "s3")
+        anims.clear()
+        counts.clear()
+        clock.t = 10.0 + _JUST_PAST_MAX_AGE
+
+        sm.purge_expired()
+
+        assert not sm.session_active
+        assert counts == [0]
+        assert anims == []
+        assert len(sm.session_ids) == 0
+
+    def test_activity_refreshes_ttl(self) -> None:
+        clock = _FakeClock(0.0)
+        sm, anims, counts = _wire_state_machine_with_recording_callbacks(
+            max_age_s=10.0, clock=clock
+        )
+        sm.handle_event(Event.SESSION_START, "s1")
+        clock.t = 8.0
+        sm.handle_event(Event.USER_PROMPT_SUBMIT, "s1")
+        anims.clear()
+        counts.clear()
+        clock.t = 18.0
+
+        sm.purge_expired()
+
+        assert sm.session_active
+        assert anims == []
+        assert counts == []
+        assert sm.session_ids == frozenset({"s1"})
+
+    def test_only_stale_session_is_removed(self) -> None:
+        clock = _FakeClock(0.0)
+        sm, anims, counts = _wire_state_machine_with_recording_callbacks(
+            max_age_s=10.0, clock=clock
+        )
+        sm.handle_event(Event.SESSION_START, "stale")
+        clock.t = 5.0
+        sm.handle_event(Event.SESSION_START, "fresh")
+        anims.clear()
+        counts.clear()
+        clock.t = 10.0 + _JUST_PAST_MAX_AGE
+
+        sm.purge_expired()
+
+        assert counts == [1]
+        assert anims == []
+        assert sm.session_ids == frozenset({"fresh"})
+
+    def test_last_active_expiring_emits_sleeping(self) -> None:
+        clock = _FakeClock(0.0)
+        sm, anims, counts = _wire_state_machine_with_recording_callbacks(
+            max_age_s=10.0, clock=clock
+        )
+        sm.handle_event(Event.SESSION_START, "s1")
+        sm.handle_event(Event.USER_PROMPT_SUBMIT, "s1")
+        assert sm.base_anim == Anim.TYPING
+        anims.clear()
+        counts.clear()
+        clock.t = 10.0 + _JUST_PAST_MAX_AGE
+
+        sm.purge_expired()
+
+        assert counts == [0]
+        assert anims == [Anim.SLEEPING]
+        assert sm.base_anim == Anim.SLEEPING
+        assert len(sm.session_ids) == 0
+
+    def test_stale_idle_while_active_remains_emits_count_only(self) -> None:
+        clock = _FakeClock(0.0)
+        sm, anims, counts = _wire_state_machine_with_recording_callbacks(
+            max_age_s=10.0, clock=clock
+        )
+        sm.handle_event(Event.SESSION_START, "idle")
+        clock.t = 5.0
+        sm.handle_event(Event.SESSION_START, "busy")
+        sm.handle_event(Event.USER_PROMPT_SUBMIT, "busy")
+        assert sm.base_anim == Anim.TYPING
+        anims.clear()
+        counts.clear()
+        clock.t = 10.0 + _JUST_PAST_MAX_AGE
+
+        sm.purge_expired()
+
+        assert counts == [1]
+        assert anims == []
+        assert sm.base_anim == Anim.TYPING
+        assert sm.session_ids == frozenset({"busy"})
+
+    def test_purge_with_nothing_stale_emits_nothing(self) -> None:
+        clock = _FakeClock(0.0)
+        sm, anims, counts = _wire_state_machine_with_recording_callbacks(
+            max_age_s=10.0, clock=clock
+        )
+        sm.handle_event(Event.SESSION_START, "s1")
+        sm.handle_event(Event.SESSION_START, "s2")
+        anims.clear()
+        counts.clear()
+
+        sm.purge_expired()
+
+        assert anims == []
+        assert counts == []
+        assert sm.session_ids == frozenset({"s1", "s2"})
 
 
 class TestColdStart:
@@ -201,13 +333,38 @@ class TestResolveAnim:
         assert sm.resolve_anim(Event.SESSION_END) == Anim.TYPING
 
 
-def _wire_state_machine_with_recording_callbacks() -> tuple[
-    PetStateMachine, list[Anim], list[int]
-]:
+def _wire_state_machine_with_recording_callbacks(
+    *,
+    max_age_s: float = 30 * 60,
+    clock: Callable[[], float] | None = None,
+) -> tuple[PetStateMachine, list[Anim], list[int]]:
     """Wire a state machine with recording callbacks; return (sm, anims, counts)."""
     anims: list[Anim] = []
     counts: list[int] = []
-    sm = PetStateMachine()
+    sm = (
+        PetStateMachine(max_age_s=max_age_s, clock=clock)
+        if clock is not None
+        else PetStateMachine(max_age_s=max_age_s)
+    )
     sm.on_anim_changed = anims.append
     sm.on_session_count_changed = counts.append
     return sm, anims, counts
+
+
+_JUST_PAST_MAX_AGE = 1e-9
+
+
+class _FakeClock:
+    """
+    Simple implementation of a fake clock for time traveling in testing.
+
+    Using an already existing lib for this would be overkill.
+    """
+
+    t: float
+
+    def __init__(self, t: float = 0.0) -> None:
+        self.t = t
+
+    def __call__(self) -> float:
+        return self.t
