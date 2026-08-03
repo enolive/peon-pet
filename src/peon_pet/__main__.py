@@ -129,6 +129,7 @@ def run(
             path=args.watch,
             poll_interval_s=poll_interval_s,
             on_event=state.handle_event,
+            on_tick=state.purge_expired,
         )
         # expose the watcher for testing so we can stop it after each integration test
         _ = app.setProperty("peon_pet_watcher", watcher)
