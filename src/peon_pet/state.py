@@ -211,9 +211,11 @@ class PetStateMachine:
         before_count = self._sessions.count
         if not self._sessions.purge_expired():
             return
-        count = self._sessions.count
-        if count != before_count:
-            self.on_session_count_changed(count)
+        after_count = self._sessions.count
+        logger.debug(
+            f"purged expired sessions before={before_count} after={after_count}."
+        )
+        self.on_session_count_changed(after_count)
         if self.base_anim is not before_base:
             self.on_anim_changed(self.base_anim)
 
