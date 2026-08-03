@@ -22,6 +22,7 @@ A friendly companion to [PeonPing](https://www.peonping.com/). Will read its sta
 > have no agent-agnostic way to reliably identify them all.
 > If you start the pet, it will try to detect any already started sessions, but that might not be always accurate.
 > It will also try to catch up on any activity.
+> Sessions with no events for 30 minutes are dropped automatically.
 > If you believe the number of active sessions is totally off, you can reset them via the Tray Control.
 
 ## Installation

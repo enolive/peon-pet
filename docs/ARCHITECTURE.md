@@ -15,6 +15,7 @@ flowchart TD
     WIN[PetWindow<br/>GUI thread]
     PP -- mtime poll --> SW
     SW -- typed Event, session_id --> SM
+    SW -- tick: purge expired --> SM
     SM -- on_anim_changed --> SEAM
     SM -- on_session_count_changed --> SEAM
     SEAM -- win . play anim --> WIN
@@ -39,7 +40,7 @@ file and drives the state machine. The state machine is pure Python (no Qt); it 
 | `tray.py`     | `TrayIcon` — system tray icon + context menu. Control surface, no state.                                               | yes |
 | `state.py`    | `PetStateMachine` — translates peon-ping events into anims. Owns the session registry + dispatch.                      | no  |
 | `events.py`   | `Event` enum + `EVENT_REACTION`/`KNOWN_EVENTS` — the peon-ping event vocabulary shared across modules.                 | no  |
-| `watcher.py`  | `StateWatcher` — polls `.state.json` (mtime-based), parses to typed `Event`, calls back. Daemon thread.                | no  |
+| `watcher.py`  | `StateWatcher` — polls `.state.json` (mtime-based), parses to typed `Event`, `on_tick` each interval. Daemon thread.   | no  |
 | `demo.py`     | `Demo` — cycles every `Anim` forever on a daemon thread. Visual QA mode.                                               | no  |
 | `prefs.py`    | `Prefs` + `WindowPosition` — reads/validates `$XDG_CONFIG_HOME/peon-pet/config.json`.                                  | no  |
 | `config.py`   | Static data: `Anim` enum, `ATLAS_LAYOUTS`, `ANIM_CONFIG`.                                                              | no  |
@@ -56,6 +57,11 @@ of known sessions, each IDLE or ACTIVE, and translates peon-ping events into a t
 session announces `WAKING` (regardless of its own reaction) so a cold `Stop` doesn't spuriously celebrate. A cold
 `SessionEnd` (nothing to wake) falls through to base.
 
+**Session TTL:** each session stores `last_seen` (refreshed on every event for that id). Entries with
+`now - last_seen > SESSION_MAX_AGE_S` (30 minutes, strict `>`) are dropped by `PetStateMachine.purge_expired()`, the
+watcher's `on_tick` target (runs after each poll, including when the file did not change). If purge changes the badge
+count, `on_session_count_changed` fires; if it changes `base_anim`, `on_anim_changed` fires too.
+
 ## The state watcher
 
 <!-- agnix-disable-next-line XP-003, false positive this describes the default watch path -->
@@ -64,6 +70,9 @@ atomically (tempfile + `os.replace`), which breaks `QFileSystemWatcher`'s inode 
 new mtime with a newer timestamp, it parses `last_active` into a typed `(Event,
 session_id)` and calls `on_event`. Unknown event names / missing fields are skipped at this read boundary (the only
 place str->`Event` parsing happens).
+
+After each poll wait, `on_tick` runs even when the file did not change (not during the initial `_emit_current` sync).
+Watch mode wires `on_tick` to `state.purge_expired`. `stop()` joins the poll thread.
 
 `poll_interval_s` is injectable (default 0.5s) so tests can run fast.
 
