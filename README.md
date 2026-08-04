@@ -31,6 +31,15 @@ Requirements:
 
 * [uv](https://docs.astral.sh/uv/): Package manager
 * [Python 3](https://www.python.org/): uv will try to bootstrap it if not present
+* [curl](https://curl.se/): used by the installer (and the one-liner below)
+
+### One-liner (GitHub Release)
+
+```bash
+curl -fsSL https://github.com/enolive/peon-pet/releases/latest/download/install.sh | bash
+```
+
+### From a source checkout
 
 ```bash
 ./install.sh

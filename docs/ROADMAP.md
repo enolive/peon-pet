@@ -23,15 +23,14 @@ Missing system Python is a warning only — `uv` can bootstrap one.
 `pyproject.toml`, builds the pure `py3-none-any` wheel, and uploads wheel + `install.sh` +
 `peon-pet.desktop` + `peon-pet.png` as release assets.
 
+**Web install / `curl … | bash` one-liner.**
+`../install.sh` auto-detects mode: source checkout -> build wheel locally; otherwise download latest
+wheel + desktop/icon from the GitHub Release.
+
 ### Remaining
 
-**Web install / `curl … | sh` one-liner.**
-`../install.sh` should support `curl -fsSL https://github.com/enolive/peon-pet/releases/latest/download/install.sh | sh` —
-the web variant downloads the wheel (and desktop/icon assets) from the same release.
-The script is the single entry point for both "install from a built wheel" and "install from the web".
-
 **Update.** `peon-pet --update` — curls the latest `../install.sh` and pipes it to
-`sh`, same as the web install one-liner. `../install.sh` detects an already installed version (via `uv tool list` /
+`bash`, same as the web install one-liner. `../install.sh` detects an already installed version (via `uv tool list` /
 checking for the existing binary) and upgrades in place instead of erroring. So install.sh is idempotent: fresh install
 and update are the same code path, distinguished by whether a version is already present.
 
