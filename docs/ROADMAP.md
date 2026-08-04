@@ -27,12 +27,10 @@ Missing system Python is a warning only — `uv` can bootstrap one.
 `../install.sh` auto-detects mode: source checkout -> build wheel locally; otherwise download latest
 wheel + desktop/icon from the GitHub Release.
 
-### Remaining
+**Update.** `peon-pet --update` downloads the latest `install.sh` from GitHub Releases and runs it via bash
+(pre-Qt argparse action). Same path as the web one-liner; install.sh no-ops when already on latest.
 
-**Update.** `peon-pet --update` — curls the latest `../install.sh` and pipes it to
-`bash`, same as the web install one-liner. `../install.sh` detects an already installed version (via `uv tool list` /
-checking for the existing binary) and upgrades in place instead of erroring. So install.sh is idempotent: fresh install
-and update are the same code path, distinguished by whether a version is already present.
+### Remaining
 
 **Uninstall.** `peon-pet --uninstall` — a flag on the executable that forwards to `uninstall.sh`. The script is
 installed by `../install.sh` to

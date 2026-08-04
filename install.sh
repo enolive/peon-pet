@@ -147,7 +147,7 @@ install_web() {
   local installed
   installed="$(installed_version)"
   if [[ "$FORCE" -eq 0 && -n "$installed" && "$installed" == "$version" ]]; then
-    echo "peon-pet v${installed} is already installed (use --force to reinstall)."
+    echo "peon-pet v${installed} is already installed."
     exit 0
   fi
 

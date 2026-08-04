@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import subprocess
 from collections.abc import Mapping, Sequence
 from enum import StrEnum
 from pathlib import Path
@@ -20,6 +21,10 @@ from . import __version__
 from .config import ANIM_CONFIG, Anim
 from .events import EVENT_REACTION, Event
 from .watcher import DEFAULT_STATE_PATH
+
+INSTALL_SH_URL = (
+    "https://github.com/enolive/peon-pet/releases/latest/download/install.sh"
+)
 
 
 class LogLevel(StrEnum):
@@ -65,6 +70,13 @@ def parse_args(argv: Sequence[str] | None) -> CliArgs:
         "--version",
         action="version",
         version=f"%(prog)s {__version__}",
+    )
+    _ = parser.add_argument(
+        "--update",
+        nargs=0,
+        action=_UpdateAction,
+        dest=argparse.SUPPRESS,
+        help="download and run the latest install.sh from GitHub Releases",
     )
     _ = parser.add_argument(
         "--anim",
@@ -131,6 +143,15 @@ def print_event_anim_mapping() -> None:
     print(f"  {Event.SESSION_END.value:22s} -> (settle to base: sleeping / typing)")
 
 
+def run_update() -> None:
+    script = subprocess.run(
+        ["curl", "-fsSL", INSTALL_SH_URL],
+        check=True,
+        capture_output=True,
+    )
+    _ = subprocess.run(["bash"], input=script.stdout, check=True)
+
+
 class _ListEventsAction(argparse.Action):
     @override
     def __call__(
@@ -141,4 +162,17 @@ class _ListEventsAction(argparse.Action):
         option_string: str | None = None,
     ) -> None:
         print_event_anim_mapping()
+        parser.exit(0)
+
+
+class _UpdateAction(argparse.Action):
+    @override
+    def __call__(
+        self,
+        parser: argparse.ArgumentParser,
+        namespace: argparse.Namespace,
+        values: object,
+        option_string: str | None = None,
+    ) -> None:
+        run_update()
         parser.exit(0)

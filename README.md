@@ -61,6 +61,8 @@ your app menu.
 peon-pet
 # same, with an explicit custom state path
 peon-pet --watch path/to/.state.json
+# install latest release (same as the web one-liner)
+peon-pet --update
 # list all available options
 peon-pet --help
 ```

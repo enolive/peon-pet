@@ -5,11 +5,13 @@ log-level enum. cli.py is pure Python (no Qt).
 import logging
 from pathlib import Path
 from typing import ClassVar
+from unittest.mock import Mock, call, patch
 
 import pytest
 
 from peon_pet import __version__
 from peon_pet.cli import (
+    INSTALL_SH_URL,
     LogLevel,
     parse_args,
     print_event_anim_mapping,
@@ -47,6 +49,24 @@ class TestListEventsFlag:
         for event in EVENT_REACTION:
             assert event.value in out
         assert Event.SESSION_END.value in out
+
+
+class TestUpdate:
+    def test_update_flag_curls_install_sh_then_pipes_to_bash(self) -> None:
+        script = b"#!/bin/bash\necho hi\n"
+        with patch("peon_pet.cli.subprocess.run") as run:
+            run.return_value = Mock(stdout=script)
+
+            with pytest.raises(SystemExit) as exc_info:
+                _ = parse_args(["--update"])
+
+            assert exc_info.value.code == 0
+            assert run.call_args_list == [
+                call(
+                    ["curl", "-fsSL", INSTALL_SH_URL], check=True, capture_output=True
+                ),
+                call(["bash"], input=script, check=True),
+            ]
 
 
 class TestParseArgs:
