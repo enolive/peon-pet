@@ -1,0 +1,42 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Verify tag matches pyproject version
+        run: |
+          version="$(uv version --short)"
+          tag="${GITHUB_REF_NAME#v}"
+          if [ "$version" != "$tag" ]; then
+            echo "pyproject.toml version ($version) does not match tag ($tag)" >&2
+            exit 1
+          fi
+
+      - name: Build wheel
+        run: uv build --wheel
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/peon_pet-*.whl
+            install.sh
+            peon-pet.desktop
+            src/peon_pet/icons/peon-pet.png
+          fail_on_unmatched_files: true

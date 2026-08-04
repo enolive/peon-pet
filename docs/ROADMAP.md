@@ -19,10 +19,15 @@ machinery (no `index.theme` / cache needed). `update-desktop-database` runs best
 **Preflight.** `../install.sh` checks for `uv` and `curl` up front (clear error + uv install one-liner if missing).
 Missing system Python is a warning only — `uv` can bootstrap one.
 
+**GitHub Release pipeline.** Tag `v*` runs `.github/workflows/release.yml`: version must match
+`pyproject.toml`, builds the pure `py3-none-any` wheel, and uploads wheel + `install.sh` +
+`peon-pet.desktop` + `peon-pet.png` as release assets.
+
 ### Remaining
 
 **Web install / `curl … | sh` one-liner.**
-`../install.sh` should support `curl -fsSL https://…/install.sh | sh` — the web variant just fetches the wheel first.
+`../install.sh` should support `curl -fsSL https://github.com/enolive/peon-pet/releases/latest/download/install.sh | sh` —
+the web variant downloads the wheel (and desktop/icon assets) from the same release.
 The script is the single entry point for both "install from a built wheel" and "install from the web".
 
 **Update.** `peon-pet --update` — curls the latest `../install.sh` and pipes it to
