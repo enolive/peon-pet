@@ -99,6 +99,17 @@ install_wheel() {
   uv tool install --force "$wheel"
 }
 
+install_uninstaller() {
+  local src="$1"
+  [[ -f "$src" ]] || die "uninstall script not found: $src"
+  local peon_bin
+  peon_bin="$(command -v peon-pet)" || die "peon-pet not on PATH after install"
+  local dest
+  dest="$(dirname "$peon_bin")/peon-pet-uninstall.sh"
+  echo "Installing uninstaller to ${dest}..."
+  install -m 755 "$src" "$dest"
+}
+
 install_desktop() {
   local icon_src="$1"
   local desktop_src="$2"
@@ -136,6 +147,7 @@ install_local() {
   install_desktop \
     "$root/src/peon_pet/icons/peon-pet.png" \
     "$root/peon-pet.desktop"
+  install_uninstaller "$root/uninstall.sh"
 }
 
 install_web() {
@@ -165,9 +177,11 @@ install_web() {
   download "${base}/${wheel_name}" "${work}/${wheel_name}"
   download "${base}/peon-pet.desktop" "${work}/peon-pet.desktop"
   download "${base}/peon-pet.png" "${work}/peon-pet.png"
+  download "${base}/uninstall.sh" "${work}/uninstall.sh"
 
   install_wheel "${work}/${wheel_name}"
   install_desktop "${work}/peon-pet.png" "${work}/peon-pet.desktop"
+  install_uninstaller "${work}/uninstall.sh"
 }
 
 main() {

@@ -63,6 +63,8 @@ peon-pet
 peon-pet --watch path/to/.state.json
 # install latest release (same as the web one-liner)
 peon-pet --update
+# remove peon-pet (keeps ~/.config/peon-pet)
+peon-pet --uninstall
 # list all available options
 peon-pet --help
 ```

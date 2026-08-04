@@ -37,6 +37,7 @@ jobs:
           files: |
             dist/peon_pet-*.whl
             install.sh
+            uninstall.sh
             peon-pet.desktop
             src/peon_pet/icons/peon-pet.png
           fail_on_unmatched_files: true

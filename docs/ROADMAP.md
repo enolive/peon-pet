@@ -2,52 +2,6 @@
 
 Pending work, in rough priority order.
 
-## Installers
-
-**Shape: separate `../install.sh` script, not a wheel-installed hook.**
-Wheels can bundle a `.desktop` file + icon (as package data) but can't install them to where the desktop environment
-looks (`$HOME/.local/share/applications/`,
-`$HOME/.local/share/icons/`) — wheels only write into the package dir + `bin/`. So the installer is a standalone script.
-
-### Done
-
-Basic `../install.sh` — builds the wheel, `uv tool install --force`s it, copies the icon to
-`$XDG_DATA_HOME/peon-pet/peon-pet.png`, and renders the `.desktop`
-entry with an absolute `Icon=` path into `$XDG_DATA_HOME/applications/`. Absolute icon path sidesteps the hicolor theme
-machinery (no `index.theme` / cache needed). `update-desktop-database` runs best-effort.
-
-**Preflight.** `../install.sh` checks for `uv` and `curl` up front (clear error + uv install one-liner if missing).
-Missing system Python is a warning only — `uv` can bootstrap one.
-
-**GitHub Release pipeline.** Tag `v*` runs `.github/workflows/release.yml`: version must match
-`pyproject.toml`, builds the pure `py3-none-any` wheel, and uploads wheel + `install.sh` +
-`peon-pet.desktop` + `peon-pet.png` as release assets.
-
-**Web install / `curl … | bash` one-liner.**
-`../install.sh` auto-detects mode: source checkout -> build wheel locally; otherwise download latest
-wheel + desktop/icon from the GitHub Release.
-
-**Update.** `peon-pet --update` downloads the latest `install.sh` from GitHub Releases and runs it via bash
-(pre-Qt argparse action). Same path as the web one-liner; install.sh no-ops when already on latest.
-
-### Remaining
-
-**Uninstall.** `peon-pet --uninstall` — a flag on the executable that forwards to `uninstall.sh`. The script is
-installed by `../install.sh` to
-`$HOME/.local/bin/peon-pet-uninstall.sh` (next to the `peon-pet` entry point), *not* bundled inside the wheel — so the
-uninstall works even if the Python env is broken or the package can't be imported. `peon-pet --uninstall` just
-`exec`s that script. The script removes the XDG files, runs
-`uv tool uninstall peon-pet`, and self-deletes at the end. The flag is a thin shell forward, not Python logic —
-uninstall steps live in one shell script.
-
-**Autostart entry.** `../install.sh` optionally drops
-`$HOME/.config/autostart/peon-pet.desktop` so the pet launches on login. Likely a
-`--autostart` flag to `../install.sh` (off by default — don't surprise users).
-
-**Cross-platform.** Linux only for now. macOS / Windows later — they have their own bundle formats (`.app` / `.dmg`,
-`.exe`) and the install model differs enough that a separate script per platform is cleaner than one cross-platform
-script.
-
 ## Rendering / reaction effects
 
 The current `QPainter` path draws the sprite cell + optional border + a numeric session-count badge. The legacy Electron
@@ -62,8 +16,25 @@ build layered more on top of the sprite — all pure rendering, no event-source 
 These are QoL polish, not core. Flash is the cheapest win; particles + shake need a small animation driver beyond the
 sprite timer.
 
-## Optional: remote relay sync
+## Cross-platform desktop install
+
+The wheel + `uv tool install` already work everywhere; only desktop glue is Linux-only (`.desktop` / XDG). Share
+`install.sh` for Linux and macOS (`Darwin` branch: tool install + optional thin `.app` launcher stub, same idea as
+`.desktop` / `.lnk`). Windows gets a separate `install.ps1` (shortcuts + uninstaller beside the shim) — do not force it
+into bash. Keep the pure wheel as the single artifact; no frozen exe/DMG until demand. peon-ping state stays
+`~/.claude/hooks/peon-ping/.state.json` by default, overridable via `--watch` and later a config `state_path` — do not
+mirror peon-ping's install-mode matrix.
+
+## Remote relay sync
 
 peon-ping can relay state to `http://127.0.0.1:19998/state` for sessions from other machines. Legacy polled this every
 5s and merged remote sessions into the tracker. Agent-agnostic, but only useful if you run the relay — so low priority
 unless someone asks.
+
+## Autostart entry
+
+Probably too intrusive. On Linux, Autostart is basically copy-pasting the .desktop file to
+`$HOME/.config/autostart/peon-pet.desktop`. If going to the installer, this should be optional and explicitly asked from
+the user.
+
+Linux users usually know how to autostart things. There are visual helpers to edit autostart entries.

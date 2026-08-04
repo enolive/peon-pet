@@ -12,6 +12,7 @@ import pytest
 from peon_pet import __version__
 from peon_pet.cli import (
     INSTALL_SH_URL,
+    UNINSTALL_SCRIPT_NAME,
     LogLevel,
     parse_args,
     print_event_anim_mapping,
@@ -67,6 +68,36 @@ class TestUpdate:
                 ),
                 call(["bash"], input=script, check=True),
             ]
+
+
+class TestUninstall:
+    def test_uninstall_flag_execs_script_next_to_peon_pet(self, tmp_path: Path) -> None:
+        pet_executable = tmp_path / "peon-pet"
+        _ = pet_executable.write_text("")
+        uninstall_script = tmp_path / UNINSTALL_SCRIPT_NAME
+        _ = uninstall_script.write_text("#!/bin/bash\n")
+        with (
+            patch("peon_pet.cli.shutil.which") as which,
+            patch("peon_pet.cli.os.execv") as execv,
+        ):
+            which.return_value = str(pet_executable)
+
+            with pytest.raises(SystemExit) as exc:
+                _ = parse_args(["--uninstall"])
+
+            assert exc.value.code == 0
+            execv.assert_called_once_with(uninstall_script, [str(uninstall_script)])
+
+    def test_uninstall_flag_errors_when_script_missing(self, tmp_path: Path) -> None:
+        peon_executable = tmp_path / "peon-pet"
+        _ = peon_executable.write_text("")
+        with patch("peon_pet.cli.shutil.which") as which:
+            which.return_value = str(peon_executable)
+
+            with pytest.raises(RuntimeError) as exc:
+                _ = parse_args(["--uninstall"])
+
+            assert "uninstall script not found" in str(exc.value)
 
 
 class TestParseArgs:

@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
+import shutil
 import subprocess
 from collections.abc import Mapping, Sequence
 from enum import StrEnum
@@ -25,6 +27,7 @@ from .watcher import DEFAULT_STATE_PATH
 INSTALL_SH_URL = (
     "https://github.com/enolive/peon-pet/releases/latest/download/install.sh"
 )
+UNINSTALL_SCRIPT_NAME = "peon-pet-uninstall.sh"
 
 
 class LogLevel(StrEnum):
@@ -61,6 +64,87 @@ class CliArgs(BaseModel):
         return LogLevel.DEBUG
 
 
+def print_event_anim_mapping() -> None:
+    print("event -> anim mapping:")
+    for event in EVENT_REACTION:
+        anim = EVENT_REACTION[event]
+        print(f"  {event:22s} -> {anim.value}")
+    # SessionEnd has no transient reaction: it removes the session and settles
+    # to the base anim (SLEEPING if none remain, else TYPING).
+    print(f"  {Event.SESSION_END.value:22s} -> (settle to base: sleeping / typing)")
+
+
+def run_update() -> None:
+    script = subprocess.run(
+        ["curl", "-fsSL", INSTALL_SH_URL],
+        check=True,
+        capture_output=True,
+    )
+    _ = subprocess.run(["bash"], input=script.stdout, check=True)
+
+
+def uninstall_script_path() -> Path:
+    peon = shutil.which("peon-pet")
+    if peon is not None:
+        candidate = Path(peon).resolve().parent / UNINSTALL_SCRIPT_NAME
+        if candidate.is_file():
+            return candidate
+    xdg_bin = os.environ.get("XDG_BIN_HOME")
+    if xdg_bin:
+        candidate = Path(xdg_bin) / UNINSTALL_SCRIPT_NAME
+        if candidate.is_file():
+            return candidate
+    return Path.home() / ".local" / "bin" / UNINSTALL_SCRIPT_NAME
+
+
+def run_uninstall() -> None:
+    path = uninstall_script_path()
+    if not path.is_file():
+        raise RuntimeError(
+            f"uninstall script not found at {path}; re-run install.sh first"
+        )
+    os.execv(path, [str(path)])
+
+
+class _ListEventsAction(argparse.Action):
+    @override
+    def __call__(
+        self,
+        parser: argparse.ArgumentParser,
+        namespace: argparse.Namespace,
+        values: object,
+        option_string: str | None = None,
+    ) -> None:
+        print_event_anim_mapping()
+        parser.exit(0)
+
+
+class _UpdateAction(argparse.Action):
+    @override
+    def __call__(
+        self,
+        parser: argparse.ArgumentParser,
+        namespace: argparse.Namespace,
+        values: object,
+        option_string: str | None = None,
+    ) -> None:
+        run_update()
+        parser.exit(0)
+
+
+class _UninstallAction(argparse.Action):
+    @override
+    def __call__(
+        self,
+        parser: argparse.ArgumentParser,
+        namespace: argparse.Namespace,
+        values: object,
+        option_string: str | None = None,
+    ) -> None:
+        run_uninstall()
+        parser.exit(0)
+
+
 def parse_args(argv: Sequence[str] | None) -> CliArgs:
     parser = argparse.ArgumentParser(
         prog="peon-pet",
@@ -77,6 +161,13 @@ def parse_args(argv: Sequence[str] | None) -> CliArgs:
         action=_UpdateAction,
         dest=argparse.SUPPRESS,
         help="download and run the latest install.sh from GitHub Releases",
+    )
+    _ = parser.add_argument(
+        "--uninstall",
+        nargs=0,
+        action=_UninstallAction,
+        dest=argparse.SUPPRESS,
+        help="remove peon-pet (desktop entry, tool install, uninstaller)",
     )
     _ = parser.add_argument(
         "--anim",
@@ -131,48 +222,3 @@ def resolve_anim(arg: str) -> Anim:
     except ValueError:
         available = ", ".join(f"{a.value} (row {ANIM_CONFIG[a].row})" for a in Anim)
         raise ValueError(f"anim not found: {arg!r}; available: {available}") from None
-
-
-def print_event_anim_mapping() -> None:
-    print("event -> anim mapping:")
-    for event in EVENT_REACTION:
-        anim = EVENT_REACTION[event]
-        print(f"  {event:22s} -> {anim.value}")
-    # SessionEnd has no transient reaction: it removes the session and settles
-    # to the base anim (SLEEPING if none remain, else TYPING).
-    print(f"  {Event.SESSION_END.value:22s} -> (settle to base: sleeping / typing)")
-
-
-def run_update() -> None:
-    script = subprocess.run(
-        ["curl", "-fsSL", INSTALL_SH_URL],
-        check=True,
-        capture_output=True,
-    )
-    _ = subprocess.run(["bash"], input=script.stdout, check=True)
-
-
-class _ListEventsAction(argparse.Action):
-    @override
-    def __call__(
-        self,
-        parser: argparse.ArgumentParser,
-        namespace: argparse.Namespace,
-        values: object,
-        option_string: str | None = None,
-    ) -> None:
-        print_event_anim_mapping()
-        parser.exit(0)
-
-
-class _UpdateAction(argparse.Action):
-    @override
-    def __call__(
-        self,
-        parser: argparse.ArgumentParser,
-        namespace: argparse.Namespace,
-        values: object,
-        option_string: str | None = None,
-    ) -> None:
-        run_update()
-        parser.exit(0)
