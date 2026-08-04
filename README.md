@@ -39,6 +39,12 @@ Requirements:
 curl -fsSL https://github.com/enolive/peon-pet/releases/latest/download/install.sh | bash
 ```
 
+Already on the latest version? The installer exits early. Repair/reinstall:
+
+```bash
+curl -fsSL https://github.com/enolive/peon-pet/releases/latest/download/install.sh | bash -s -- --force
+```
+
 ### From a source checkout
 
 ```bash

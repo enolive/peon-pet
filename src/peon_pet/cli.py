@@ -12,9 +12,11 @@ import logging
 from collections.abc import Mapping, Sequence
 from enum import StrEnum
 from pathlib import Path
+from typing import override
 
 from pydantic import BaseModel
 
+from . import __version__
 from .config import ANIM_CONFIG, Anim
 from .events import EVENT_REACTION, Event
 from .watcher import DEFAULT_STATE_PATH
@@ -43,7 +45,6 @@ class CliArgs(BaseModel):
     anim: str | None = None
     demo: bool = False
     watch: Path | None = None
-    list_events: bool = False
     verbose: int = 0
 
     @property
@@ -61,6 +62,11 @@ def parse_args(argv: Sequence[str] | None) -> CliArgs:
         description="Desktop pet that reacts to peon-ping events.",
     )
     _ = parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
+    )
+    _ = parser.add_argument(
         "--anim",
         default=None,
         help="anim to play on startup; takes precedence over --watch and --demo",
@@ -73,8 +79,9 @@ def parse_args(argv: Sequence[str] | None) -> CliArgs:
     )
     _ = mode.add_argument(
         "--list-events",
-        default=False,
-        action="store_true",
+        nargs=0,
+        action=_ListEventsAction,
+        dest=argparse.SUPPRESS,
         help="list all known events and their mappings to anims and exit",
     )
     _ = parser.add_argument(
@@ -97,13 +104,10 @@ def parse_args(argv: Sequence[str] | None) -> CliArgs:
     )
     ns = parser.parse_args(argv)
     cli_args = CliArgs.model_validate(vars(ns))
-    no_args_given = (
-        cli_args.watch is None
-        and not cli_args.demo
-        and not cli_args.list_events
-        and cli_args.anim is None
+    no_mode_given = (
+        cli_args.watch is None and not cli_args.demo and cli_args.anim is None
     )
-    if no_args_given:
+    if no_mode_given:
         cli_args = cli_args.model_copy(update={"watch": DEFAULT_STATE_PATH})
     return cli_args
 
@@ -125,3 +129,16 @@ def print_event_anim_mapping() -> None:
     # SessionEnd has no transient reaction: it removes the session and settles
     # to the base anim (SLEEPING if none remain, else TYPING).
     print(f"  {Event.SESSION_END.value:22s} -> (settle to base: sleeping / typing)")
+
+
+class _ListEventsAction(argparse.Action):
+    @override
+    def __call__(
+        self,
+        parser: argparse.ArgumentParser,
+        namespace: argparse.Namespace,
+        values: object,
+        option_string: str | None = None,
+    ) -> None:
+        print_event_anim_mapping()
+        parser.exit(0)

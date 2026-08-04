@@ -5,6 +5,7 @@ offscreen Qt, no display, and no real peon-ping.
 """
 
 import json
+from collections.abc import Sequence
 from pathlib import Path
 
 import pytest
@@ -12,6 +13,7 @@ from PySide6 import QtWidgets
 from pytestqt.qtbot import QtBot
 
 from peon_pet.__main__ import run
+from peon_pet.cli import parse_args
 from peon_pet.config import Anim
 from peon_pet.window import PetWindow
 
@@ -29,7 +31,7 @@ class TestWatchIntegration:
     ) -> None:
         state_path = tmp_path / ".state.json"
         # No pre-seeded file -> genuinely cold first event.
-        win = run(
+        win = _run(
             single_instance_app,
             ["--watch", str(state_path)],
             single_instance_name=single_instance_server_name,
@@ -59,7 +61,7 @@ class TestWatchIntegration:
         # Pre-seed a Stop: a cold start on an event that registers the session
         # announces WAKING (not CELEBRATE) — the cold-start override.
         _write_state(state_path, "Stop", "s1", 1.0)
-        win = run(
+        win = _run(
             single_instance_app,
             ["--watch", str(state_path)],
             single_instance_name=single_instance_server_name,
@@ -84,7 +86,7 @@ class TestAnimIntegration:
         single_instance_server_name: str,
     ) -> None:
         # No pre-seeded file -> genuinely cold first event.
-        win = run(
+        win = _run(
             single_instance_app,
             ["--anim", "annoyed"],
             single_instance_name=single_instance_server_name,
@@ -101,31 +103,12 @@ class TestAnimIntegration:
         single_instance_server_name: str,
     ) -> None:
         with pytest.raises(ValueError):
-            _ = run(
+            _ = _run(
                 single_instance_app,
                 ["--anim", "bogus"],
                 single_instance_name=single_instance_server_name,
             )
 
-        assert PetWindow not in single_instance_app.topLevelWidgets(), (
-            "application should close instantly"
-        )
-
-
-class TestListEvents:
-    def test_list_events_and_exits_immediately(
-        self,
-        single_instance_app: QtWidgets.QApplication,
-        single_instance_server_name: str,
-    ) -> None:
-        with pytest.raises(SystemExit) as exc:
-            _ = run(
-                single_instance_app,
-                ["--list-events"],
-                single_instance_name=single_instance_server_name,
-            )
-
-        assert exc.value.code == 0
         assert PetWindow not in single_instance_app.topLevelWidgets(), (
             "application should close instantly"
         )
@@ -138,7 +121,7 @@ class TestDemoIntegration:
         qtbot: QtBot,
         single_instance_server_name: str,
     ) -> None:
-        win = run(
+        win = _run(
             single_instance_app,
             ["--demo"],
             single_instance_name=single_instance_server_name,
@@ -155,6 +138,21 @@ class TestDemoIntegration:
         qtbot.waitUntil(lambda: win.anim == Anim.SLEEPING, timeout=TIMEOUT_MS)
 
         assert win.anim == Anim.SLEEPING
+
+
+def _run(
+    app: QtWidgets.QApplication,
+    argv: Sequence[str],
+    *,
+    single_instance_name: str,
+    poll_interval_s: float = POLL_INTERVAL_SECONDS,
+) -> PetWindow:
+    return run(
+        app,
+        parse_args(argv),
+        single_instance_name=single_instance_name,
+        poll_interval_s=poll_interval_s,
+    )
 
 
 def _write_state(path: Path, event: str, sid: str, ts: float) -> None:

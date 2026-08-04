@@ -9,6 +9,7 @@ from PySide6 import QtWidgets
 from pytestqt.qtbot import QtBot
 
 from peon_pet.__main__ import DEBUG_LOG_REL, run
+from peon_pet.cli import parse_args
 from tests.assertions import wait_until
 
 TIMEOUT_S = 5.0
@@ -26,7 +27,7 @@ def test_vv_writes_debug_records_to_state_dir(
 
     win = run(
         single_instance_app,
-        ["--anim", "annoyed", "-vv"],
+        parse_args(["--anim", "annoyed", "-vv"]),
         single_instance_name=single_instance_server_name,
     )
     qtbot.addWidget(win)

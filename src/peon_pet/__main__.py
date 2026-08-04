@@ -1,10 +1,4 @@
-"""Entry point: parse args, build the Qt app, run the event loop.
-
-`run` wires the app and returns the window without calling `app.exec()`; `main`
-creates the app, calls `run`, then blocks on `app.exec()`. The split keeps the
-wired chain testable: tests pass a per-test app fixture into `run(...)` and
-drive the event loop themselves instead of fighting a blocking `app.exec()`.
-"""
+"""Entry point: parse args, build the Qt app, run the event loop."""
 
 from __future__ import annotations
 
@@ -22,7 +16,6 @@ from .cli import (
     CliArgs,
     LogLevel,
     parse_args,
-    print_event_anim_mapping,
     resolve_anim,
 )
 from .config import Anim
@@ -46,16 +39,17 @@ def main(
     single_instance_name: str = "peon-pet",
     poll_interval_s: float = POLL_INTERVAL_S,
 ) -> None:
-    """Build the app and block on its event loop. Errors from run() are printed
-    to stderr and exit(1) is called."""
     try:
+        # args are parsed before the Qt loop to avoid useless initialization in case something goes wrong
+        # or the action is an immediate exit (such as --version)
+        args = parse_args(argv)
         app = QtWidgets.QApplication(sys.argv)
         app.setApplicationName("Peon Pet")
         # prevent quitting on last window closed which will quit the app after the about dialog.
         app.setQuitOnLastWindowClosed(False)
         _win = run(
             app,
-            argv,
+            args,
             single_instance_name=single_instance_name,
             poll_interval_s=poll_interval_s,
         )
@@ -67,24 +61,17 @@ def main(
 
 def run(
     app: QtWidgets.QApplication,
-    argv: Sequence[str] | None = None,
+    args: CliArgs,
     *,
     single_instance_name: str = "peon-pet",
     poll_interval_s: float = POLL_INTERVAL_S,
 ) -> PetWindow:
-    """Wire window/watcher/tray for the parsed args and return the window.
-
-    Receives the `QApplication` (created by `main`, or a per-test fixture) so
-    tests can own the app's lifecycle and avoid two QApplications coexisting.
-    Does NOT call `app.exec()`; `main` does that.
     """
-    args = parse_args(argv)
+    Testable version of `main` that returns the window instead of blocking on
+    `app.exec()`.
+    """
     _configure_logging(args)
     logger.debug("args=%s", args)
-
-    if args.list_events:
-        print_event_anim_mapping()
-        sys.exit(0)
 
     prefs = Prefs()
     claim_single_instance(app, name=single_instance_name)

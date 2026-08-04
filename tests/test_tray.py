@@ -2,6 +2,7 @@
 
 from PySide6 import QtCore, QtWidgets
 
+from peon_pet import __version__
 from peon_pet.tray import TrayIcon
 
 
@@ -34,4 +35,5 @@ def test_about_opens_message_box_with_name_description_and_repo(
 
     assert seen["title"] == "About Peon Pet"
     assert "Peon Pet" in seen["text"]
+    assert __version__ in seen["text"]
     assert "https://github.com/enolive/peon-pet" in seen["text"]

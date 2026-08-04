@@ -8,6 +8,7 @@ from typing import ClassVar
 
 import pytest
 
+from peon_pet import __version__
 from peon_pet.cli import (
     LogLevel,
     parse_args,
@@ -19,6 +20,35 @@ from peon_pet.events import EVENT_REACTION, Event
 from peon_pet.watcher import DEFAULT_STATE_PATH
 
 
+class TestVersion:
+    def test_package_version_matches_metadata(self) -> None:
+        from importlib.metadata import version
+
+        assert __version__ == version("peon-pet")
+
+    def test_cli_version_flag_prints_version_and_exits(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        with pytest.raises(SystemExit) as exc_info:
+            _ = parse_args(["--version"])
+
+        assert exc_info.value.code == 0
+        assert __version__ in capsys.readouterr().out
+
+
+class TestListEventsFlag:
+    def test_prints_mapping_and_exits(self, capsys: pytest.CaptureFixture[str]) -> None:
+        with pytest.raises(SystemExit) as exc_info:
+            _ = parse_args(["--list-events"])
+
+        assert exc_info.value.code == 0
+        out = capsys.readouterr().out
+        assert "event -> anim mapping:" in out
+        for event in EVENT_REACTION:
+            assert event.value in out
+        assert Event.SESSION_END.value in out
+
+
 class TestParseArgs:
     def test_defaults_to_watch_when_no_args(self) -> None:
         args = parse_args([])
@@ -26,7 +56,6 @@ class TestParseArgs:
         assert args.watch == DEFAULT_STATE_PATH
         assert args.demo is False
         assert args.anim is None
-        assert args.list_events is False
         assert args.log_level is LogLevel.WARNING
 
     def test_defaults_to_watch_with_only_verbose(self) -> None:
@@ -79,12 +108,6 @@ class TestParseArgs:
         args = parse_args(["--watch", str(state_path)])
 
         assert args.watch == state_path
-
-    def test_list_events_flag_is_set(self) -> None:
-        args = parse_args(["--list-events"])
-
-        assert args.list_events is True
-        assert args.watch is None
 
 
 class TestResolveAnim:

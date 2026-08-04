@@ -10,6 +10,7 @@ from typing import final
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
+from . import __version__
 from .config import ICONS
 
 
@@ -38,6 +39,7 @@ def show_about() -> None:
         # language=html
         text = f"""<body style="text-align: center">
 <h1>Peon Pet</h1>
+<p>{__version__}</p>
 <p><img src="{icon}" width="100" height="100" alt=""></p>
 <p>Friendly pet companion that reacts to <a href="https://www.peonping.com">PeonPing</a> events.</p>
 <p>
