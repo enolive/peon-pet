@@ -11,8 +11,10 @@ A desktop pet that reacts to peon-ping events. Python + PySide6.
 - When the user asks you to write some implementation, insist on a test-first approach. There are acceptable exceptions
   for that. The point is to make good development practice a habit. Deviations from it should be a deliberate choice.
   For instance:
-  - a quick proof something actually is possible
-  - something not tested yet
+    - a quick proof something actually is possible
+    - something not tested yet
+    - trivial shell glue (`release.sh`, one-shot install helpers) where a pytest wrapper would only assert
+      `bash -n` / executable bits - that is ceremony, not coverage. Don't add tests just to satisfy TDD optics.
 
 ### Test style
 
@@ -59,6 +61,13 @@ uv run ruff check .         # pretty formatting
 LC_ALL=C uv run basedpyright # type-check. LC_ALL=C forces English output
 uv run pytest                # run tests
 ```
+
+## Releases
+
+- Version source of truth is `pyproject.toml` only (no `__version__` mirror).
+- **Do not** create release tags, push `v*` tags, or craft GitHub Releases by hand.
+- Ask the user to do that by increasing the version in `pyproject.toml` and running `./release.sh`.
+- That script confirms with an explicit `y/N` prompt, tags `vX.Y.Z`, and pushes so CI can publish the release assets.
 
 ### Sprite atlases
 
