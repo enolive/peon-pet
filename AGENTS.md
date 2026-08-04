@@ -67,7 +67,9 @@ uv run pytest                # run tests
 - Version source of truth is `pyproject.toml` only (no `__version__` mirror).
 - **Do not** create release tags, push `v*` tags, or craft GitHub Releases by hand.
 - Ask the user to do that by increasing the version in `pyproject.toml` and running `./release.sh`.
-- That script confirms with an explicit `y/N` prompt, tags `vX.Y.Z`, and pushes so CI can publish the release assets.
+- That script confirms with an explicit `y/N` prompt; may auto-commit `pyproject.toml` / `uv.lock` if
+  those are the only dirty files, then tags `vX.Y.Z` and pushes so CI can publish the release assets.
+  Any other dirty files abort the release.
 
 ### Sprite atlases
 
