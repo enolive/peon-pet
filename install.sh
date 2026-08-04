@@ -39,9 +39,9 @@ EOF
 resolve_script_dir() {
   local src="${BASH_SOURCE[0]:-}"
   case "$src" in
-    "" | bash | sh | -bash | -sh)
-      return 1
-      ;;
+  "" | bash | sh | -bash | -sh)
+    return 1
+    ;;
   esac
   [[ -f "$src" ]] || return 1
   cd "$(dirname "$src")" && pwd
@@ -104,21 +104,21 @@ install_desktop() {
   local desktop_src="$2"
 
   case "$(uname -s)" in
-    Linux)
-      echo "Installing desktop entry + icon..."
-      local data_dir="${XDG_DATA_HOME:-$HOME/.local/share}"
-      local applications_dir="$data_dir/applications"
-      local icon_dir="$data_dir/peon-pet"
-      mkdir -p "$applications_dir" "$icon_dir"
-      # Absolute icon path sidesteps the hicolor theme machinery (no index.theme/cache needed).
-      local icon_path="$icon_dir/peon-pet.png"
-      cp "$icon_src" "$icon_path" -v
-      sed "s|^Icon=.*|Icon=$icon_path|" "$desktop_src" >"$applications_dir/peon-pet.desktop"
-      update-desktop-database "$applications_dir" 2>/dev/null || true
-      ;;
-    *)
-      warn "Skipping desktop entry + icon (not Linux)."
-      ;;
+  Linux)
+    echo "Installing desktop entry + icon..."
+    local data_dir="${XDG_DATA_HOME:-$HOME/.local/share}"
+    local applications_dir="$data_dir/applications"
+    local icon_dir="$data_dir/peon-pet"
+    mkdir -p "$applications_dir" "$icon_dir"
+    # Absolute icon path sidesteps the hicolor theme machinery (no index.theme/cache needed).
+    local icon_path="$icon_dir/peon-pet.png"
+    cp "$icon_src" "$icon_path" -v
+    sed "s|^Icon=.*|Icon=$icon_path|" "$desktop_src" >"$applications_dir/peon-pet.desktop"
+    update-desktop-database "$applications_dir" 2>/dev/null || true
+    ;;
+  *)
+    warn "Skipping desktop entry + icon (not Linux)."
+    ;;
   esac
 }
 
@@ -148,7 +148,7 @@ install_web() {
   installed="$(installed_version)"
   if [[ "$FORCE" -eq 0 && -n "$installed" && "$installed" == "$version" ]]; then
     echo "peon-pet v${installed} is already installed (use --force to reinstall)."
-    return 0
+    exit 0
   fi
 
   local work
@@ -173,17 +173,17 @@ install_web() {
 main() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --force)
-        FORCE=1
-        shift
-        ;;
-      -h | --help)
-        usage
-        exit 0
-        ;;
-      *)
-        die "unknown argument: $1 (try --help)"
-        ;;
+    --force)
+      FORCE=1
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      die "unknown argument: $1 (try --help)"
+      ;;
     esac
   done
 
