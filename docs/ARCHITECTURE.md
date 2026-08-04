@@ -80,9 +80,10 @@ Watch mode wires `on_tick` to `state.purge_expired`. `stop()` joins the poll thr
 
 `__main__.py` is split so the wired chain is testable:
 
-- **`run(app, argv, ...) -> PetWindow`** — wires the app (window, watcher/demo, tray, seam) for the parsed args and
+- **`run(app, argv, ...) -> PetWindow`** — wires the app (window, watcher/demo, tray, seam) for the passed args and
   returns the window. Raises errors on bad input (bad anim name, bad atlas).
-- **`main(argv, *, ...) -> None`** — creates the `QApplication`, calls `run`, catches errors to print a pretty `ERROR:`
+- **`main(argv, *, ...) -> None`** — parses args including preemptive exits and errors, creates the `QApplication`,
+  calls `run`, catches errors to print a pretty `ERROR:`
   and exit 1, then blocks on `app.exec()`. The real entry point (`peon-pet` script, `__main__`).
 
 The split lets integration tests call `run(...)` with a per-test `QApplication`
