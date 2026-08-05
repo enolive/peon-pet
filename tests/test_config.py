@@ -4,7 +4,15 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from peon_pet.config import ANIM_CONFIG, ATLAS_LAYOUTS, Anim, Rgba
+from peon_pet.config import (
+    ANIM_CONFIG,
+    ATLAS_LAYOUTS,
+    Anim,
+    FlashConfig,
+    ParticleConfig,
+    Rgba,
+    ShakeConfig,
+)
 
 
 def test_every_anim_has_a_config() -> None:
@@ -20,7 +28,11 @@ def test_every_anim_row_fits_every_atlas(atlas: str) -> None:
 
 
 def test_reaction_anims_have_flash() -> None:
-    with_flash = {a for a, c in ANIM_CONFIG.items() if c.flash is not None}
+    with_flash = {
+        a
+        for a, c in ANIM_CONFIG.items()
+        if any(isinstance(e, FlashConfig) for e in c.effects)
+    }
 
     assert with_flash == {
         Anim.WAKING,
@@ -30,25 +42,32 @@ def test_reaction_anims_have_flash() -> None:
     }
 
 
-def test_base_anims_have_no_flash() -> None:
-    assert ANIM_CONFIG[Anim.SLEEPING].flash is None
-    assert ANIM_CONFIG[Anim.TYPING].flash is None
+def test_base_anims_have_no_effects() -> None:
+    assert ANIM_CONFIG[Anim.SLEEPING].effects == ()
+    assert ANIM_CONFIG[Anim.TYPING].effects == ()
 
 
 def test_only_annoyed_has_shake() -> None:
-    with_shake = {a for a, c in ANIM_CONFIG.items() if c.shake is not None}
+    with_shake = {
+        a
+        for a, c in ANIM_CONFIG.items()
+        if any(isinstance(e, ShakeConfig) for e in c.effects)
+    }
 
     assert with_shake == {Anim.ANNOYED}
-    shake = ANIM_CONFIG[Anim.ANNOYED].shake
-    assert shake is not None
 
 
 def test_only_celebrate_has_particles() -> None:
-    with_particles = {a for a, c in ANIM_CONFIG.items() if c.particles is not None}
+    with_particles = {
+        a
+        for a, c in ANIM_CONFIG.items()
+        if any(isinstance(e, ParticleConfig) for e in c.effects)
+    }
 
     assert with_particles == {Anim.CELEBRATE}
-    particles = ANIM_CONFIG[Anim.CELEBRATE].particles
-    assert particles is not None
+    particles = next(
+        e for e in ANIM_CONFIG[Anim.CELEBRATE].effects if isinstance(e, ParticleConfig)
+    )
     assert particles.count == 30
     assert particles.duration == 1.2
 

@@ -8,8 +8,12 @@ from hypothesis import given
 from hypothesis import strategies as st
 from hypothesis.strategies import SearchStrategy
 
+from peon_pet.config import FlashConfig, ParticleConfig, Rgba, ShakeConfig
 from peon_pet.effects import (
+    EffectPlayer,
+    FlashOverlay,
     Particle,
+    ParticleOverlay,
     burst_opacity,
     decay_linear,
     particle_to_qt,
@@ -171,3 +175,52 @@ class TestParticles:
             assert math.isfinite(got.x)
             assert math.isfinite(got.y)
             assert math.isfinite(got.vy)
+
+
+class TestEffectPlayer:
+    def test_empty_arm_is_inactive(self) -> None:
+        sut = EffectPlayer()
+
+        sut.arm(())
+
+        assert not sut.active
+        assert sut.sprite_offset() == (0.0, 0.0)
+        assert sut.overlays() == []
+
+    def test_arm_replaces_previous_effects(self) -> None:
+        sut = EffectPlayer()
+        sut.arm(
+            (ShakeConfig(12.0, 8.0),),
+            rng=random.Random(0),
+        )
+        assert sut.shake_intensity > 0.0
+
+        sut.arm(
+            (FlashConfig(Rgba.from_hex("#FFCC00", a=0.5), 2.0),),
+            rng=random.Random(0),
+        )
+
+        assert sut.shake_intensity == 0.0
+        assert sut.flash_intensity == pytest.approx(0.5)
+
+    def test_tick_expires_flash(self) -> None:
+        sut = EffectPlayer()
+        sut.arm((FlashConfig(Rgba.from_hex("#FFFFFF", a=0.5), 10.0),))
+
+        assert sut.tick(dt=1.0) is False
+        assert not sut.active
+
+    def test_overlays_include_flash_and_particles(self) -> None:
+        sut = EffectPlayer()
+        sut.arm(
+            (
+                FlashConfig(Rgba.from_hex("#FFCC00", a=0.5), 2.0),
+                ParticleConfig(count=5, duration=1.2),
+            ),
+            rng=random.Random(0),
+        )
+
+        kinds = {type(o) for o in sut.overlays()}
+
+        assert kinds == {FlashOverlay, ParticleOverlay}
+        assert sut.particle_count == 5

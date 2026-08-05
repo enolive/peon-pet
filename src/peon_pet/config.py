@@ -73,15 +73,16 @@ class ParticleConfig:
     duration: float
 
 
+EffectSpec = FlashConfig | ShakeConfig | ParticleConfig
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class AnimConfig:
     row: int
     frames: int
     fps: int
     loop: bool
-    flash: FlashConfig | None = None
-    shake: ShakeConfig | None = None
-    particles: ParticleConfig | None = None
+    effects: tuple[EffectSpec, ...] = ()
 
 
 # Known atlases: short name -> layout.
@@ -97,7 +98,7 @@ ANIM_CONFIG: dict[Anim, AnimConfig] = {
         frames=6,
         fps=8,
         loop=False,
-        flash=FlashConfig(Rgba.from_hex("#66CCFF", a=0.3), 2.0),
+        effects=(FlashConfig(Rgba.from_hex("#66CCFF", a=0.3), 2.0),),
     ),
     Anim.TYPING: AnimConfig(row=2, frames=6, fps=8, loop=True),
     Anim.ALARMED: AnimConfig(
@@ -105,22 +106,26 @@ ANIM_CONFIG: dict[Anim, AnimConfig] = {
         frames=6,
         fps=8,
         loop=False,
-        flash=FlashConfig(Rgba.from_hex("#FF1A1A", a=0.5), 2.5),
+        effects=(FlashConfig(Rgba.from_hex("#FF1A1A", a=0.5), 2.5),),
     ),
     Anim.CELEBRATE: AnimConfig(
         row=4,
         frames=6,
         fps=8,
         loop=False,
-        flash=FlashConfig(Rgba.from_hex("#FFCC00", a=0.5), 2.0),
-        particles=ParticleConfig(count=30, duration=1.2),
+        effects=(
+            FlashConfig(Rgba.from_hex("#FFCC00", a=0.5), 2.0),
+            ParticleConfig(count=30, duration=1.2),
+        ),
     ),
     Anim.ANNOYED: AnimConfig(
         row=5,
         frames=6,
         fps=8,
         loop=False,
-        flash=FlashConfig(Rgba.from_hex("#CC6600", a=0.3), 2.0),
-        shake=ShakeConfig(12.0, 8.0),
+        effects=(
+            FlashConfig(Rgba.from_hex("#CC6600", a=0.3), 2.0),
+            ShakeConfig(12.0, 8.0),
+        ),
     ),
 }
