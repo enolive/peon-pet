@@ -1,8 +1,10 @@
 """Tests for atlas/anim config invariants."""
 
 import pytest
+from hypothesis import given
+from hypothesis import strategies as st
 
-from peon_pet.config import ANIM_CONFIG, ATLAS_LAYOUTS, Anim, AnimConfig, Rgba
+from peon_pet.config import ANIM_CONFIG, ATLAS_LAYOUTS, Anim, Rgba
 
 
 def test_every_anim_has_a_config() -> None:
@@ -31,6 +33,14 @@ def test_reaction_anims_have_flash() -> None:
 def test_base_anims_have_no_flash() -> None:
     assert ANIM_CONFIG[Anim.SLEEPING].flash is None
     assert ANIM_CONFIG[Anim.TYPING].flash is None
+
+
+def test_only_annoyed_has_shake() -> None:
+    with_shake = {a for a, c in ANIM_CONFIG.items() if c.shake is not None}
+
+    assert with_shake == {Anim.ANNOYED}
+    shake = ANIM_CONFIG[Anim.ANNOYED].shake
+    assert shake is not None
 
 
 class TestRgbaFromHex:
@@ -65,3 +75,34 @@ class TestRgbaFromHex:
     def test_rejects_non_hex(self, value: str) -> None:
         with pytest.raises(ValueError):
             _ = Rgba.from_hex(value)
+
+    @given(
+        r=st.integers(min_value=0, max_value=255),
+        g=st.integers(min_value=0, max_value=255),
+        b=st.integers(min_value=0, max_value=255),
+        a=st.floats(
+            min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False
+        ),
+        use_hash=st.booleans(),
+        upper=st.booleans(),
+    )
+    def test_valid_hex_maps_to_channels(
+        self,
+        r: int,
+        g: int,
+        b: int,
+        a: float,
+        use_hash: bool,
+        upper: bool,
+    ) -> None:
+        body = f"{r:02x}{g:02x}{b:02x}"
+        if upper:
+            body = body.upper()
+        color = f"#{body}" if use_hash else body
+
+        sut = Rgba.from_hex(color, a=a)
+
+        assert sut.r == pytest.approx(r / 255)
+        assert sut.g == pytest.approx(g / 255)
+        assert sut.b == pytest.approx(b / 255)
+        assert sut.a == a

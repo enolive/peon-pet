@@ -2,6 +2,8 @@
 finished-signal boundary that the state machine depends on.
 """
 
+from typing import final
+
 import pytest
 from PySide6 import QtCore
 from PySide6.QtTest import QSignalSpy
@@ -134,8 +136,61 @@ class TestPlayIdempotent:
         assert sut.frame == 0
 
 
+class TestEffectResetOnPlay:
+    def test_switching_anim_clears_residual_shake(self, qtbot: QtBot) -> None:
+        sut = PetWindow(_make_prefs())
+        qtbot.addWidget(sut)
+        effects = _EffectsDriver(sut)
+        sut.play(Anim.ANNOYED, play_forever=True)
+
+        sut.play(Anim.SLEEPING)
+
+        assert effects.shake_intensity == 0.0
+        assert effects.shake_offset == (0.0, 0.0)
+        assert effects.flash_intensity == 0.0
+
+    def test_switching_anim_rearms_destination_effects(self, qtbot: QtBot) -> None:
+        sut = PetWindow(_make_prefs())
+        qtbot.addWidget(sut)
+        effects = _EffectsDriver(sut)
+        sut.play(Anim.ANNOYED, play_forever=True)
+
+        sut.play(Anim.CELEBRATE, play_forever=True)
+
+        assert effects.shake_intensity == 0.0
+        flash = ANIM_CONFIG[Anim.CELEBRATE].flash
+        assert flash is not None
+        assert effects.flash_intensity == pytest.approx(flash.color.a)
+
+
 def _make_prefs() -> Prefs:
     """Prefs with the default atlas and a tiny loop count for fast boundary tests."""
     # Offscreen Qt: construction without a display. Defaults suffice (atlas
     # '2b', loops 3). XDG_CONFIG_HOME is isolated by the test environment.
     return Prefs()
+
+
+# noinspection protected-member
+@final
+class _EffectsDriver:
+    """Reads PetWindow effect state - no public API for residual FX after play()."""
+
+    _w: PetWindow
+
+    def __init__(self, window: PetWindow) -> None:
+        self._w = window
+
+    @property
+    def shake_intensity(self) -> float:
+        return self._w._shake_intensity  # pyright: ignore[reportPrivateUsage]
+
+    @property
+    def shake_offset(self) -> tuple[float, float]:
+        return (
+            self._w._shake_dx,  # pyright: ignore[reportPrivateUsage]
+            self._w._shake_dy,  # pyright: ignore[reportPrivateUsage]
+        )
+
+    @property
+    def flash_intensity(self) -> float:
+        return self._w._flash_intensity  # pyright: ignore[reportPrivateUsage]

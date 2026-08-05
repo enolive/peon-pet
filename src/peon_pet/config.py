@@ -61,6 +61,12 @@ class FlashConfig:
     decay: float
 
 
+@dataclass(frozen=True, slots=True)
+class ShakeConfig:
+    intensity: float
+    decay: float
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class AnimConfig:
     row: int
@@ -68,6 +74,7 @@ class AnimConfig:
     fps: int
     loop: bool
     flash: FlashConfig | None = None
+    shake: ShakeConfig | None = None
 
 
 # Known atlases: short name -> layout.
@@ -106,5 +113,6 @@ ANIM_CONFIG: dict[Anim, AnimConfig] = {
         fps=8,
         loop=False,
         flash=FlashConfig(Rgba.from_hex("#CC6600", a=0.3), 2.0),
+        shake=ShakeConfig(12.0, 8.0),
     ),
 }

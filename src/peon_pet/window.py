@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import logging
+import random
 from typing import final, override
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
-from .config import ANIM_CONFIG, ASSETS, ATLAS_LAYOUTS, Anim, FlashConfig
-from .effects import decay_flash
+from .config import ANIM_CONFIG, ASSETS, ATLAS_LAYOUTS, Anim, FlashConfig, ShakeConfig
+from .effects import decay_linear, shake_offset
 from .prefs import Prefs
 
 _BADGE_FG_COLOR = "white"
@@ -83,6 +84,11 @@ class PetWindow(QtWidgets.QWidget):
         self._session_count = 0
         self._flash: FlashConfig | None = None
         self._flash_intensity = 0.0
+        self._shake: ShakeConfig | None = None
+        self._shake_intensity = 0.0
+        self._shake_dx = 0.0
+        self._shake_dy = 0.0
+        self._rng = random.Random()
         self._timer = QtCore.QTimer(self)
         _ = self._timer.timeout.connect(self.advance)
         self._effect_timer = QtCore.QTimer(self)
@@ -143,26 +149,63 @@ class PetWindow(QtWidgets.QWidget):
         self._timer.setInterval(int(1000 / cfg.fps))
         if not self._timer.isActive():
             self._timer.start()
+        self._clear_effects()
         self._arm_flash(cfg.flash)
+        self._arm_shake(cfg.shake)
+
+    def _clear_effects(self) -> None:
+        self._flash = None
+        self._flash_intensity = 0.0
+        self._shake = None
+        self._shake_intensity = 0.0
+        self._shake_dx = 0.0
+        self._shake_dy = 0.0
+        self._effect_timer.stop()
 
     def _arm_flash(self, flash: FlashConfig | None) -> None:
         if flash is None:
             return
         self._flash = flash
         self._flash_intensity = flash.color.a
+        self._start_effect_timer()
+
+    def _arm_shake(self, shake: ShakeConfig | None) -> None:
+        if shake is None:
+            return
+        self._shake = shake
+        self._shake_intensity = shake.intensity
+        self._shake_dx, self._shake_dy = shake_offset(self._shake_intensity, self._rng)
+        self._start_effect_timer()
+
+    def _start_effect_timer(self) -> None:
         if not self._effect_timer.isActive():
             self._effect_timer.start(_EFFECT_INTERVAL_MS)
 
     def _tick_effects(self) -> None:
-        if self._flash is None or self._flash_intensity <= 0.0:
-            self._flash_intensity = 0.0
-            self._effect_timer.stop()
-            return
         dt = _EFFECT_INTERVAL_MS / 1000.0
-        self._flash_intensity = decay_flash(
-            self._flash_intensity, dt, self._flash.decay
-        )
-        if self._flash_intensity <= 0.0:
+        active = False
+
+        if self._flash is not None and self._flash_intensity > 0.0:
+            self._flash_intensity = decay_linear(
+                self._flash_intensity, dt, self._flash.decay
+            )
+            if self._flash_intensity > 0.0:
+                active = True
+
+        if self._shake is not None and self._shake_intensity > 0.0:
+            self._shake_intensity = decay_linear(
+                self._shake_intensity, dt, self._shake.decay
+            )
+            if self._shake_intensity > 0.0:
+                self._shake_dx, self._shake_dy = shake_offset(
+                    self._shake_intensity, self._rng
+                )
+                active = True
+            else:
+                self._shake_dx = 0.0
+                self._shake_dy = 0.0
+
+        if not active:
             self._effect_timer.stop()
         self.update()
 
@@ -240,8 +283,8 @@ class PetWindow(QtWidgets.QWidget):
         p = QtGui.QPainter(self)
         p.setRenderHint(QtGui.QPainter.RenderHint.SmoothPixmapTransform, False)
 
-        sx = (_WIN_SIZE - _SPRITE_SIZE) // 2
-        sy = (_WIN_SIZE - _SPRITE_SIZE) // 2
+        sx = (_WIN_SIZE - _SPRITE_SIZE) // 2 + self._shake_dx
+        sy = (_WIN_SIZE - _SPRITE_SIZE) // 2 + self._shake_dy
         src = cell_rect(self._frame, self._row, self._cell_w, self._cell_h)
         p.drawPixmap(
             QtCore.QRectF(sx, sy, _SPRITE_SIZE, _SPRITE_SIZE), self._atlas, src

@@ -4,16 +4,36 @@ Pending work, in rough priority order.
 
 ## Rendering / reaction effects
 
-The current `QPainter` path draws the sprite cell + optional border + a numeric session-count badge. The legacy Electron
-build layered more on top of the sprite — all pure rendering, no event-source dependency, so re-addable:
+Pure paint/timer polish on top of the sprite — no event-source changes. Iterate one effect per slice; each needs eyes
+via `--anim <name>` / `--demo` (not worth automating).
 
-- **Per-anim color flash** — done (`AnimConfig.flash` + effect timer; flat `QPainter` fill with alpha decay).
-- **Particle burst** — gold confetti on `celebrate`.
-- **Screen shake** — jitter the sprite on `annoyed`.
-- **Background image** — `bg-pixel.png` behind the sprite (legacy tinted it grey; current has no bg).
+### Done
 
-These are QoL polish, not core. Particles + shake can reuse the effect timer introduced for flash.
-Visual QA: `uv run peon-pet --anim celebrate` (etc.) and `--demo`.
+- **Per-anim color flash** — `AnimConfig.flash: FlashConfig | None` with `Rgba.from_hex("#RRGGBB", a=...)` + decay.
+  Effect timer (~60fps) while live. Paint order: sprite → border → flash → badge (flash above border, legacy z-order).
+  Pure helpers in `effects.py`. Optional effects live on `AnimConfig` (sane middle: no EffectConfig hierarchy / Noop).
+- **Screen shake** on `annoyed` — `AnimConfig.shake: ShakeConfig | None` (intensity 12, decay 8). Jitters the **sprite
+   draw offset** only (not the window). Shares the effect timer with flash. QA: `uv run peon-pet --anim annoyed`.
+
+### Next (reuse the effect timer)
+
+1. **Particle burst** on `celebrate` — `AnimConfig.particles: ParticleConfig | None`. ~30 gold confetti, gravity,
+   ~1.2s lifetime, `QPainter` dots (no GL). Pure step helper unit-tested; paint is demo-gated. QA: `--anim celebrate`.
+2. **Background image** — `bg-pixel.png` under the sprite (legacy grey tint). Independent of motion FX; easy rollback
+   if it fights the frameless look.
+
+### Conventions (carry forward)
+
+- Trigger only from `PetWindow.play()` via `ANIM_CONFIG[anim]` fields; state machine untouched.
+- Redundant `play` (same anim+loop) stays a no-op — do not re-arm effects mid-cycle.
+- A real anim switch clears residual FX first, then arms the new anim's effects (no shake bleed into sleeping).
+- Test pure math with Hypothesis where the space is large (`decay_linear`, `shake_offset` bounds, `Rgba.from_hex`);
+  `play()` effect clear/re-arm is a couple of focused examples. Not `paintEvent`. Visual sign-off before the next slice.
+- Hardcode legacy constants first; prefs toggles only if someone asks.
+
+### Out of scope here
+
+Shader parity, screenshot tests, new events/anims, installers/relay.
 
 ## Cross-platform desktop install
 
