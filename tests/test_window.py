@@ -137,17 +137,19 @@ class TestPlayIdempotent:
 
 
 class TestEffectResetOnPlay:
-    def test_switching_anim_clears_residual_shake(self, qtbot: QtBot) -> None:
+    def test_switching_anim_clears_residual_effects(self, qtbot: QtBot) -> None:
         sut = PetWindow(_make_prefs())
         qtbot.addWidget(sut)
         effects = _EffectsDriver(sut)
-        sut.play(Anim.ANNOYED, play_forever=True)
+        sut.play(Anim.CELEBRATE, play_forever=True)
+        assert effects.particle_count > 0
 
         sut.play(Anim.SLEEPING)
 
         assert effects.shake_intensity == 0.0
         assert effects.shake_offset == (0.0, 0.0)
         assert effects.flash_intensity == 0.0
+        assert effects.particle_count == 0
 
     def test_switching_anim_rearms_destination_effects(self, qtbot: QtBot) -> None:
         sut = PetWindow(_make_prefs())
@@ -161,6 +163,9 @@ class TestEffectResetOnPlay:
         flash = ANIM_CONFIG[Anim.CELEBRATE].flash
         assert flash is not None
         assert effects.flash_intensity == pytest.approx(flash.color.a)
+        particles = ANIM_CONFIG[Anim.CELEBRATE].particles
+        assert particles is not None
+        assert effects.particle_count == particles.count
 
 
 def _make_prefs() -> Prefs:
@@ -194,3 +199,7 @@ class _EffectsDriver:
     @property
     def flash_intensity(self) -> float:
         return self._w._flash_intensity  # pyright: ignore[reportPrivateUsage]
+
+    @property
+    def particle_count(self) -> int:
+        return len(self._w._particles)  # pyright: ignore[reportPrivateUsage]

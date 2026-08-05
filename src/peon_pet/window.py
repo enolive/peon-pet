@@ -8,8 +8,24 @@ from typing import final, override
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
-from .config import ANIM_CONFIG, ASSETS, ATLAS_LAYOUTS, Anim, FlashConfig, ShakeConfig
-from .effects import decay_linear, shake_offset
+from .config import (
+    ANIM_CONFIG,
+    ASSETS,
+    ATLAS_LAYOUTS,
+    Anim,
+    FlashConfig,
+    ParticleConfig,
+    ShakeConfig,
+)
+from .effects import (
+    Particle,
+    burst_opacity,
+    decay_linear,
+    particle_to_qt,
+    shake_offset,
+    spawn_particles,
+    step_particle,
+)
 from .prefs import Prefs
 
 _BADGE_FG_COLOR = "white"
@@ -17,6 +33,10 @@ _BADGE_BG_COLOR = "#0c6d1a"
 _WIN_SIZE: int = 200
 _SPRITE_SIZE: int = 180  # inset like the JS (PlaneGeometry 180 in a 200 win)
 _EFFECT_INTERVAL_MS = 16  # ~60fps while a flash (etc.) is live
+_PARTICLE_SIZE = 6.0
+# Fixed paint origin for particle space (not derived from _WIN_SIZE - tweak to taste).
+_PARTICLE_ORIGIN_X = 80.0
+_PARTICLE_ORIGIN_Y = 30.0
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +108,9 @@ class PetWindow(QtWidgets.QWidget):
         self._shake_intensity = 0.0
         self._shake_dx = 0.0
         self._shake_dy = 0.0
+        self._particles: list[Particle] = []
+        self._particle_lifetime = 0.0
+        self._particle_duration = 0.0
         self._rng = random.Random()
         self._timer = QtCore.QTimer(self)
         _ = self._timer.timeout.connect(self.advance)
@@ -152,6 +175,7 @@ class PetWindow(QtWidgets.QWidget):
         self._clear_effects()
         self._arm_flash(cfg.flash)
         self._arm_shake(cfg.shake)
+        self._arm_particles(cfg.particles)
 
     def _clear_effects(self) -> None:
         self._flash = None
@@ -160,6 +184,9 @@ class PetWindow(QtWidgets.QWidget):
         self._shake_intensity = 0.0
         self._shake_dx = 0.0
         self._shake_dy = 0.0
+        self._particles = []
+        self._particle_lifetime = 0.0
+        self._particle_duration = 0.0
         self._effect_timer.stop()
 
     def _arm_flash(self, flash: FlashConfig | None) -> None:
@@ -175,6 +202,14 @@ class PetWindow(QtWidgets.QWidget):
         self._shake = shake
         self._shake_intensity = shake.intensity
         self._shake_dx, self._shake_dy = shake_offset(self._shake_intensity, self._rng)
+        self._start_effect_timer()
+
+    def _arm_particles(self, cfg: ParticleConfig | None) -> None:
+        if cfg is None:
+            return
+        self._particles = spawn_particles(cfg.count, self._rng)
+        self._particle_lifetime = cfg.duration
+        self._particle_duration = cfg.duration
         self._start_effect_timer()
 
     def _start_effect_timer(self) -> None:
@@ -204,6 +239,14 @@ class PetWindow(QtWidgets.QWidget):
             else:
                 self._shake_dx = 0.0
                 self._shake_dy = 0.0
+
+        if self._particle_lifetime > 0.0:
+            self._particle_lifetime = max(0.0, self._particle_lifetime - dt)
+            self._particles = [step_particle(p, dt) for p in self._particles]
+            if self._particle_lifetime > 0.0:
+                active = True
+            else:
+                self._particles = []
 
         if not active:
             self._effect_timer.stop()
@@ -296,14 +339,36 @@ class PetWindow(QtWidgets.QWidget):
             QtCore.QRectF(0, 0, self._border.width(), self._border.height()),
         )
 
-        # Flash above border (legacy z-order); badge stays on top.
+        # Flash above border (legacy z-order); particles above flash; badge on top.
         if self._flash is not None and self._flash_intensity > 0.0:
             c = self._flash.color
             color = QtGui.QColor.fromRgbF(c.r, c.g, c.b, self._flash_intensity)
             p.fillRect(self.rect(), color)
 
+        if self._particles:
+            self._draw_particles(p)
+
         if self._session_count > 0:
             self._draw_badge(p)
+
+    def _draw_particles(self, p: QtGui.QPainter) -> None:
+        opacity = burst_opacity(self._particle_lifetime, self._particle_duration)
+        if opacity <= 0.0:
+            return
+        half = _PARTICLE_SIZE / 2.0
+        p.setPen(QtCore.Qt.PenStyle.NoPen)
+        for particle in self._particles:
+            color = QtGui.QColor.fromRgbF(particle.r, particle.g, particle.b, opacity)
+            p.setBrush(color)
+            qx, qy = particle_to_qt(
+                particle.x,
+                particle.y,
+                origin_x=_PARTICLE_ORIGIN_X,
+                origin_y=_PARTICLE_ORIGIN_Y,
+            )
+            p.drawRect(
+                QtCore.QRectF(qx - half, qy - half, _PARTICLE_SIZE, _PARTICLE_SIZE)
+            )
 
     def _draw_badge(self, p: QtGui.QPainter) -> None:
         # Cap at 9+ so the badge stays a fixed size.

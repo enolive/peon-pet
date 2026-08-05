@@ -67,6 +67,12 @@ class ShakeConfig:
     decay: float
 
 
+@dataclass(frozen=True, slots=True)
+class ParticleConfig:
+    count: int
+    duration: float
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class AnimConfig:
     row: int
@@ -75,6 +81,7 @@ class AnimConfig:
     loop: bool
     flash: FlashConfig | None = None
     shake: ShakeConfig | None = None
+    particles: ParticleConfig | None = None
 
 
 # Known atlases: short name -> layout.
@@ -106,6 +113,7 @@ ANIM_CONFIG: dict[Anim, AnimConfig] = {
         fps=8,
         loop=False,
         flash=FlashConfig(Rgba.from_hex("#FFCC00", a=0.5), 2.0),
+        particles=ParticleConfig(count=30, duration=1.2),
     ),
     Anim.ANNOYED: AnimConfig(
         row=5,

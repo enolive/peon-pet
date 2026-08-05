@@ -14,12 +14,12 @@ via `--anim <name>` / `--demo` (not worth automating).
   Pure helpers in `effects.py`. Optional effects live on `AnimConfig` (sane middle: no EffectConfig hierarchy / Noop).
 - **Screen shake** on `annoyed` — `AnimConfig.shake: ShakeConfig | None` (intensity 12, decay 8). Jitters the **sprite
    draw offset** only (not the window). Shares the effect timer with flash. QA: `uv run peon-pet --anim annoyed`.
+- **Particle burst** on `celebrate` — `AnimConfig.particles: ParticleConfig | None` (30 gold confetti, 1.2s).
+  Pure spawn/step/opacity in `effects.py`; drawn above flash. QA: `uv run peon-pet --anim celebrate`.
 
 ### Next (reuse the effect timer)
 
-1. **Particle burst** on `celebrate` — `AnimConfig.particles: ParticleConfig | None`. ~30 gold confetti, gravity,
-   ~1.2s lifetime, `QPainter` dots (no GL). Pure step helper unit-tested; paint is demo-gated. QA: `--anim celebrate`.
-2. **Background image** — `bg-pixel.png` under the sprite (legacy grey tint). Independent of motion FX; easy rollback
+1. **Background image** — `bg-pixel.png` under the sprite (legacy grey tint). Independent of motion FX; easy rollback
    if it fights the frameless look.
 
 ### Conventions (carry forward)

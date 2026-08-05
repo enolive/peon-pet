@@ -43,6 +43,16 @@ def test_only_annoyed_has_shake() -> None:
     assert shake is not None
 
 
+def test_only_celebrate_has_particles() -> None:
+    with_particles = {a for a, c in ANIM_CONFIG.items() if c.particles is not None}
+
+    assert with_particles == {Anim.CELEBRATE}
+    particles = ANIM_CONFIG[Anim.CELEBRATE].particles
+    assert particles is not None
+    assert particles.count == 30
+    assert particles.duration == 1.2
+
+
 class TestRgbaFromHex:
     def test_parses_hash_prefixed_rgb(self) -> None:
         sut = Rgba.from_hex("#66CCFF", a=0.3)
