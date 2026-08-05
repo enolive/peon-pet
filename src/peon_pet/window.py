@@ -7,13 +7,15 @@ from typing import final, override
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
-from .config import ANIM_CONFIG, ASSETS, ATLAS_LAYOUTS, Anim
+from .config import ANIM_CONFIG, ASSETS, ATLAS_LAYOUTS, Anim, FlashConfig
+from .effects import decay_flash
 from .prefs import Prefs
 
 _BADGE_FG_COLOR = "white"
 _BADGE_BG_COLOR = "#0c6d1a"
 _WIN_SIZE: int = 200
 _SPRITE_SIZE: int = 180  # inset like the JS (PlaneGeometry 180 in a 200 win)
+_EFFECT_INTERVAL_MS = 16  # ~60fps while a flash (etc.) is live
 
 logger = logging.getLogger(__name__)
 
@@ -79,8 +81,12 @@ class PetWindow(QtWidgets.QWidget):
         self._loops_played = 0
         self._drag_offset: QtCore.QPoint | None = None
         self._session_count = 0
+        self._flash: FlashConfig | None = None
+        self._flash_intensity = 0.0
         self._timer = QtCore.QTimer(self)
         _ = self._timer.timeout.connect(self.advance)
+        self._effect_timer = QtCore.QTimer(self)
+        _ = self._effect_timer.timeout.connect(self._tick_effects)
         self.play(start_anim)
 
         # Position: saved overrides the default bottom-left corner.
@@ -137,6 +143,28 @@ class PetWindow(QtWidgets.QWidget):
         self._timer.setInterval(int(1000 / cfg.fps))
         if not self._timer.isActive():
             self._timer.start()
+        self._arm_flash(cfg.flash)
+
+    def _arm_flash(self, flash: FlashConfig | None) -> None:
+        if flash is None:
+            return
+        self._flash = flash
+        self._flash_intensity = flash.color.a
+        if not self._effect_timer.isActive():
+            self._effect_timer.start(_EFFECT_INTERVAL_MS)
+
+    def _tick_effects(self) -> None:
+        if self._flash is None or self._flash_intensity <= 0.0:
+            self._flash_intensity = 0.0
+            self._effect_timer.stop()
+            return
+        dt = _EFFECT_INTERVAL_MS / 1000.0
+        self._flash_intensity = decay_flash(
+            self._flash_intensity, dt, self._flash.decay
+        )
+        if self._flash_intensity <= 0.0:
+            self._effect_timer.stop()
+        self.update()
 
     def _warn_missing_anims(self, atlas: str) -> None:
         missing = missing_anims(self._rows)
@@ -225,7 +253,12 @@ class PetWindow(QtWidgets.QWidget):
             QtCore.QRectF(0, 0, self._border.width(), self._border.height()),
         )
 
-        # Badge last so it sits on top.
+        # Flash above border (legacy z-order); badge stays on top.
+        if self._flash is not None and self._flash_intensity > 0.0:
+            c = self._flash.color
+            color = QtGui.QColor.fromRgbF(c.r, c.g, c.b, self._flash_intensity)
+            p.fillRect(self.rect(), color)
+
         if self._session_count > 0:
             self._draw_badge(p)
 

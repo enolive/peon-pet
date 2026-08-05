@@ -7,14 +7,13 @@ Pending work, in rough priority order.
 The current `QPainter` path draws the sprite cell + optional border + a numeric session-count badge. The legacy Electron
 build layered more on top of the sprite — all pure rendering, no event-source dependency, so re-addable:
 
-- **Per-anim color flash** — a brief tint overlay on `waking`/`alarmed`/
-  `celebrate`/`annoyed` (shader in legacy; a flat `QPainter` fill with alpha decay would do here).
+- **Per-anim color flash** — done (`AnimConfig.flash` + effect timer; flat `QPainter` fill with alpha decay).
 - **Particle burst** — gold confetti on `celebrate`.
 - **Screen shake** — jitter the sprite on `annoyed`.
 - **Background image** — `bg-pixel.png` behind the sprite (legacy tinted it grey; current has no bg).
 
-These are QoL polish, not core. Flash is the cheapest win; particles + shake need a small animation driver beyond the
-sprite timer.
+These are QoL polish, not core. Particles + shake can reuse the effect timer introduced for flash.
+Visual QA: `uv run peon-pet --anim celebrate` (etc.) and `--demo`.
 
 ## Cross-platform desktop install
 
