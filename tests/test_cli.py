@@ -8,6 +8,7 @@ from typing import ClassVar
 from unittest.mock import Mock, call, patch
 
 import pytest
+from _pytest.monkeypatch import MonkeyPatch
 
 from peon_pet import __version__
 from peon_pet.cli import (
@@ -81,6 +82,46 @@ class TestUninstall:
             patch("peon_pet.cli.os.execv") as execv,
         ):
             which.return_value = str(pet_executable)
+
+            with pytest.raises(SystemExit) as exc:
+                _ = parse_args(["--uninstall"])
+
+            assert exc.value.code == 0
+            execv.assert_called_once_with(uninstall_script, [str(uninstall_script)])
+
+    def test_uninstall_flag_execs_script_from_xdg_home(
+        self, tmp_path: Path, monkeypatch: MonkeyPatch
+    ) -> None:
+        uninstall_script = tmp_path / UNINSTALL_SCRIPT_NAME
+        _ = uninstall_script.write_text("#!/bin/bash\n")
+        monkeypatch.setenv("XDG_BIN_HOME", str(tmp_path))
+        with (
+            patch("peon_pet.cli.os.execv") as execv,
+            patch("peon_pet.cli.shutil.which") as which,
+        ):
+            which.return_value = None
+
+            with pytest.raises(SystemExit) as exc:
+                _ = parse_args(["--uninstall"])
+
+            assert exc.value.code == 0
+            execv.assert_called_once_with(uninstall_script, [str(uninstall_script)])
+
+    def test_uninstall_flag_execs_script_from_local_bin(
+        self, tmp_path: Path, monkeypatch: MonkeyPatch
+    ) -> None:
+        local_bin_path = tmp_path / ".local" / "bin"
+        local_bin_path.mkdir(parents=True)
+        uninstall_script = local_bin_path / UNINSTALL_SCRIPT_NAME
+        _ = uninstall_script.write_text("#!/bin/bash\n")
+        monkeypatch.delenv("XDG_BIN_HOME", raising=False)
+        with (
+            patch("peon_pet.cli.os.execv") as execv,
+            patch("peon_pet.cli.shutil.which") as which,
+            patch("peon_pet.cli.Path.home") as home,
+        ):
+            which.return_value = None
+            home.return_value = tmp_path
 
             with pytest.raises(SystemExit) as exc:
                 _ = parse_args(["--uninstall"])

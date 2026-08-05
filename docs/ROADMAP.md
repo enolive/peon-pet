@@ -2,38 +2,24 @@
 
 Pending work, in rough priority order.
 
-## Rendering / reaction effects
+## Inspect this error that occurs on ctrl+c
 
-Pure paint/timer polish on top of the sprite — no event-source changes. Iterate one effect per slice; each needs eyes
-via `--anim <name>` / `--demo` (not worth automating).
+probably a race condition due to threading and a destroyed window
 
-### Done
+window owns signal -> destroying the window tries to send the to the s
 
-- **Per-anim color flash** — `AnimConfig.flash: FlashConfig | None` with `Rgba.from_hex("#RRGGBB", a=...)` + decay.
-  Effect timer (~60fps) while live. Paint order: sprite → border → flash → badge (flash above border, legacy z-order).
-  Pure helpers in `effects.py`. Optional effects live on `AnimConfig` (sane middle: no EffectConfig hierarchy / Noop).
-- **Screen shake** on `annoyed` — `AnimConfig.shake: ShakeConfig | None` (intensity 12, decay 8). Jitters the **sprite
-   draw offset** only (not the window). Shares the effect timer with flash. QA: `uv run peon-pet --anim annoyed`.
-- **Particle burst** on `celebrate` — `AnimConfig.particles: ParticleConfig | None` (30 gold confetti, 1.2s).
-  Pure spawn/step/opacity in `effects.py`; drawn above flash. QA: `uv run peon-pet --anim celebrate`.
-
-### Next (reuse the effect timer)
-
-1. **Background image** — `bg-pixel.png` under the sprite (legacy grey tint). Independent of motion FX; easy rollback
-   if it fights the frameless look.
-
-### Conventions (carry forward)
-
-- Trigger only from `PetWindow.play()` via `ANIM_CONFIG[anim]` fields; state machine untouched.
-- Redundant `play` (same anim+loop) stays a no-op — do not re-arm effects mid-cycle.
-- A real anim switch clears residual FX first, then arms the new anim's effects (no shake bleed into sleeping).
-- Test pure math with Hypothesis where the space is large (`decay_linear`, `shake_offset` bounds, `Rgba.from_hex`);
-  `play()` effect clear/re-arm is a couple of focused examples. Not `paintEvent`. Visual sign-off before the next slice.
-- Hardcode legacy constants first; prefs toggles only if someone asks.
-
-### Out of scope here
-
-Shader parity, screenshot tests, new events/anims, installers/relay.
+```log
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+    self.run()
+  File "/usr/lib/python3.12/threading.py", line 1010, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/chris/Coding/opt/peon-pet/src/peon_pet/demo.py", line 56, in _run
+    self._emit()
+  File "/home/chris/Coding/opt/peon-pet/src/peon_pet/demo.py", line 59, in _emit
+    self.on_anim_changed(next(self._it))
+RuntimeError: Signal source has been deleted
+```
 
 ## Cross-platform desktop install
 
@@ -57,3 +43,9 @@ Probably too intrusive. On Linux, Autostart is basically copy-pasting the .deskt
 the user.
 
 Linux users usually know how to autostart things. There are visual helpers to edit autostart entries.
+
+## Background Image
+
+(`bg-pixel.png`, legacy grey tint) — worth considering for **transparent sprites on a bare canvas** (contrast against
+busy wallpapers). Not useful while atlases ship with their own border/frame; a full-rect bg tends to fight the
+floating-pet look. Revisit if a borderless atlas lands or users report wallpaper clash.

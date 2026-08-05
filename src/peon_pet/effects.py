@@ -43,8 +43,8 @@ def decay_linear(value: float, dt: float, rate: float) -> float:
 
 def shake_offset(intensity: float, rng: random.Random) -> tuple[float, float]:
     if intensity <= 0.0:
-        return (0.0, 0.0)
-    return ((rng.random() - 0.5) * intensity, (rng.random() - 0.5) * intensity)
+        return 0.0, 0.0
+    return (rng.random() - 0.5) * intensity, (rng.random() - 0.5) * intensity
 
 
 def burst_opacity(lifetime: float, duration: float) -> float:
@@ -57,7 +57,7 @@ def particle_to_qt(
     x: float, y: float, *, origin_x: float, origin_y: float
 ) -> tuple[float, float]:
     """Particle space (y up) -> Qt widget pixels (y down)."""
-    return (origin_x + x, origin_y - y)
+    return origin_x + x, origin_y - y
 
 
 def spawn_particles(count: int, rng: random.Random) -> list[Particle]:

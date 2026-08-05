@@ -108,9 +108,9 @@ class TestParticleToQt:
         )
 
     def test_x_right_becomes_x_right(self) -> None:
-        assert particle_to_qt(10.0, 20.0, origin_x=100.0, origin_y=100.0) == (
+        assert particle_to_qt(10.0, 0, origin_x=100.0, origin_y=100.0) == (
             110.0,
-            80.0,
+            100.0,
         )
 
 
@@ -135,11 +135,12 @@ class TestBurstOpacity:
 
 class TestParticles:
     counts: SearchStrategy[int] = st.integers(min_value=1, max_value=1000)
-    seeds: SearchStrategy[int] = st.integers(min_value=0, max_value=2**32 - 1)
 
     @given(count=counts)
     def test_spawn_count_does_not_depend_on_seed(self, count: int) -> None:
-        assert len(spawn_particles(count, random.Random(0))) == count
+        r = random.Random()
+
+        assert len(spawn_particles(count, r)) == count
 
     def test_step_applies_velocity_and_gravity(self) -> None:
         p = Particle(x=0.0, y=0.0, vx=10.0, vy=20.0, gravity=-50.0, r=1.0, g=1.0, b=0.0)
@@ -150,7 +151,7 @@ class TestParticles:
         assert got.y == pytest.approx(2.0)
         assert got.vy == pytest.approx(15.0)
 
-    @given(count=counts, seed=seeds)
+    @given(count=counts, seed=st.floats(min_value=0.0, max_value=2**32 - 1))
     def test_spawn_deterministic_with_seed(self, count: int, seed: int) -> None:
         particles1 = spawn_particles(count, random.Random(seed))
         particles2 = spawn_particles(count, random.Random(seed))
@@ -161,10 +162,9 @@ class TestParticles:
         dt=st.floats(
             min_value=0.0, max_value=0.1, allow_nan=False, allow_infinity=False
         ),
-        seed=seeds,
     )
-    def test_step_keeps_finite_state(self, dt: float, seed: int) -> None:
-        particles = spawn_particles(8, random.Random(seed))
+    def test_step_keeps_finite_state(self, dt: float) -> None:
+        particles = spawn_particles(8, random.Random())
 
         for p in particles:
             got = step_particle(p, dt)
