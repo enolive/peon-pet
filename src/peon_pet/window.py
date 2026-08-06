@@ -6,16 +6,30 @@ import logging
 from typing import final, override
 
 from PySide6 import QtCore, QtGui, QtWidgets
+from PySide6.QtGui import QPainter
 
-from .config import ANIM_CONFIG, ASSETS, ATLAS_LAYOUTS, Anim
+from .config import ANIM_CONFIG, ASSETS, ATLAS_LAYOUTS, Anim, Rgb
+from .effects import EffectPlayer, FlashOverlay, Particle, ParticleOverlay
 from .prefs import Prefs
 
 _BADGE_FG_COLOR = "white"
 _BADGE_BG_COLOR = "#0c6d1a"
 _WIN_SIZE: int = 200
 _SPRITE_SIZE: int = 180  # inset like the JS (PlaneGeometry 180 in a 200 win)
+_EFFECT_INTERVAL_MS = 16  # ~60fps while effects are live
+_PARTICLE_SIZE = 6.0
+# Fixed paint origin for particle space (not derived from _WIN_SIZE - tweak to taste).
+_PARTICLE_ORIGIN_X = 80.0
+_PARTICLE_ORIGIN_Y = 30.0
 
 logger = logging.getLogger(__name__)
+
+
+def particle_to_qt(
+    x: float, y: float, *, origin_x: float, origin_y: float
+) -> tuple[float, float]:
+    """Particle space (y up) -> Qt widget pixels (y down)."""
+    return origin_x + x, origin_y - y
 
 
 def cell_rect(frame: int, row: int, cell_w: float, cell_h: float) -> QtCore.QRectF:
@@ -49,6 +63,8 @@ class PetWindow(QtWidgets.QWidget):
         start_anim: Anim = Anim.SLEEPING,
     ) -> None:
         super().__init__()
+        self._row = 0
+        self._max_frames = 0
         self.setWindowFlags(
             QtCore.Qt.WindowType.FramelessWindowHint
             | QtCore.Qt.WindowType.WindowStaysOnTopHint
@@ -79,8 +95,11 @@ class PetWindow(QtWidgets.QWidget):
         self._loops_played = 0
         self._drag_offset: QtCore.QPoint | None = None
         self._session_count = 0
+        self._effects = EffectPlayer()
         self._timer = QtCore.QTimer(self)
         _ = self._timer.timeout.connect(self.advance)
+        self._effect_timer = QtCore.QTimer(self)
+        _ = self._effect_timer.timeout.connect(self._tick_effects)
         self.play(start_anim)
 
         # Position: saved overrides the default bottom-left corner.
@@ -110,6 +129,10 @@ class PetWindow(QtWidgets.QWidget):
     def frame(self) -> int:
         return self._frame
 
+    @property
+    def effects(self):
+        return self._effects
+
     def _move_default(self) -> None:
         screen = QtWidgets.QApplication.primaryScreen()
         geo = screen.availableGeometry()
@@ -137,6 +160,18 @@ class PetWindow(QtWidgets.QWidget):
         self._timer.setInterval(int(1000 / cfg.fps))
         if not self._timer.isActive():
             self._timer.start()
+        self._effects.arm(cfg.effects)
+        if self._effects.active:
+            if not self._effect_timer.isActive():
+                self._effect_timer.start(_EFFECT_INTERVAL_MS)
+        else:
+            self._effect_timer.stop()
+
+    def _tick_effects(self) -> None:
+        dt = _EFFECT_INTERVAL_MS / 1000.0
+        if not self._effects.tick(dt):
+            self._effect_timer.stop()
+        self.update()
 
     def _warn_missing_anims(self, atlas: str) -> None:
         missing = missing_anims(self._rows)
@@ -212,8 +247,9 @@ class PetWindow(QtWidgets.QWidget):
         p = QtGui.QPainter(self)
         p.setRenderHint(QtGui.QPainter.RenderHint.SmoothPixmapTransform, False)
 
-        sx = (_WIN_SIZE - _SPRITE_SIZE) // 2
-        sy = (_WIN_SIZE - _SPRITE_SIZE) // 2
+        shake_dx, shake_dy = self._effects.sprite_offset()
+        sx = (_WIN_SIZE - _SPRITE_SIZE) // 2 + shake_dx
+        sy = (_WIN_SIZE - _SPRITE_SIZE) // 2 + shake_dy
         src = cell_rect(self._frame, self._row, self._cell_w, self._cell_h)
         p.drawPixmap(
             QtCore.QRectF(sx, sy, _SPRITE_SIZE, _SPRITE_SIZE), self._atlas, src
@@ -225,9 +261,39 @@ class PetWindow(QtWidgets.QWidget):
             QtCore.QRectF(0, 0, self._border.width(), self._border.height()),
         )
 
-        # Badge last so it sits on top.
+        # Overlays above border (legacy flash z-order); badge stays on top.
+        for overlay in self._effects.overlays():
+            match overlay:
+                case FlashOverlay(rgb=rgb, intensity=intensity):
+                    self._draw_overlay(p, rgb, intensity)
+                case ParticleOverlay(particles=particles, opacity=opacity):
+                    self._draw_particles(p, particles, opacity)
+
         if self._session_count > 0:
             self._draw_badge(p)
+
+    def _draw_overlay(self, p: QPainter, rgb: Rgb, intensity: float) -> None:
+        p.fillRect(self.rect(), _qcolor(rgb, intensity))
+
+    @staticmethod
+    def _draw_particles(
+        p: QtGui.QPainter,
+        particles: tuple[Particle, ...],
+        opacity: float,
+    ) -> None:
+        half = _PARTICLE_SIZE / 2.0
+        p.setPen(QtCore.Qt.PenStyle.NoPen)
+        for particle in particles:
+            p.setBrush(_qcolor(particle.color, opacity))
+            qx, qy = particle_to_qt(
+                particle.x,
+                particle.y,
+                origin_x=_PARTICLE_ORIGIN_X,
+                origin_y=_PARTICLE_ORIGIN_Y,
+            )
+            p.drawRect(
+                QtCore.QRectF(qx - half, qy - half, _PARTICLE_SIZE, _PARTICLE_SIZE)
+            )
 
     def _draw_badge(self, p: QtGui.QPainter) -> None:
         # Cap at 9+ so the badge stays a fixed size.
@@ -251,3 +317,8 @@ class PetWindow(QtWidgets.QWidget):
             QtCore.Qt.AlignmentFlag.AlignCenter,
             text,
         )
+
+
+def _qcolor(rgb: Rgb, a: float) -> QtGui.QColor:
+    """Rgb 0..255 + alpha 0..1 -> QColor (conversion only at the Qt edge)."""
+    return QtGui.QColor(rgb.r, rgb.g, rgb.b, max(0, min(255, round(a * 255))))

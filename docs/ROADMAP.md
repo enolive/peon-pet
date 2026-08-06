@@ -2,19 +2,24 @@
 
 Pending work, in rough priority order.
 
-## Rendering / reaction effects
+## Inspect this error that occurs on ctrl+c
 
-The current `QPainter` path draws the sprite cell + optional border + a numeric session-count badge. The legacy Electron
-build layered more on top of the sprite — all pure rendering, no event-source dependency, so re-addable:
+probably a race condition due to threading and a destroyed window
 
-- **Per-anim color flash** — a brief tint overlay on `waking`/`alarmed`/
-  `celebrate`/`annoyed` (shader in legacy; a flat `QPainter` fill with alpha decay would do here).
-- **Particle burst** — gold confetti on `celebrate`.
-- **Screen shake** — jitter the sprite on `annoyed`.
-- **Background image** — `bg-pixel.png` behind the sprite (legacy tinted it grey; current has no bg).
+window owns signal -> destroying the window tries to send the to the s
 
-These are QoL polish, not core. Flash is the cheapest win; particles + shake need a small animation driver beyond the
-sprite timer.
+```log
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+    self.run()
+  File "/usr/lib/python3.12/threading.py", line 1010, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/chris/Coding/opt/peon-pet/src/peon_pet/demo.py", line 56, in _run
+    self._emit()
+  File "/home/chris/Coding/opt/peon-pet/src/peon_pet/demo.py", line 59, in _emit
+    self.on_anim_changed(next(self._it))
+RuntimeError: Signal source has been deleted
+```
 
 ## Cross-platform desktop install
 
@@ -38,3 +43,9 @@ Probably too intrusive. On Linux, Autostart is basically copy-pasting the .deskt
 the user.
 
 Linux users usually know how to autostart things. There are visual helpers to edit autostart entries.
+
+## Background Image
+
+(`bg-pixel.png`, legacy grey tint) — worth considering for **transparent sprites on a bare canvas** (contrast against
+busy wallpapers). Not useful while atlases ship with their own border/frame; a full-rect bg tends to fight the
+floating-pet look. Revisit if a borderless atlas lands or users report wallpaper clash.

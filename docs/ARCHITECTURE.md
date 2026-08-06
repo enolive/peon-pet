@@ -43,7 +43,8 @@ file and drives the state machine. The state machine is pure Python (no Qt); it 
 | `watcher.py`  | `StateWatcher` — polls `.state.json` (mtime-based), parses to typed `Event`, `on_tick` each interval. Daemon thread.   | no  |
 | `demo.py`     | `Demo` — cycles every `Anim` forever on a daemon thread. Visual QA mode.                                               | no  |
 | `prefs.py`    | `Prefs` + `WindowPosition` — reads/validates `$XDG_CONFIG_HOME/peon-pet/config.json`.                                  | no  |
-| `config.py`   | Static data: `Anim` enum, `ATLAS_LAYOUTS`, `ANIM_CONFIG`.                                                              | no  |
+| `config.py`   | Static data: `Anim` enum, `ATLAS_LAYOUTS`, `ANIM_CONFIG` (playback + `effects` tuple of specs).                        | no  |
+| `effects.py`  | Pure effect helpers + `EffectPlayer` / live effects (flash, shake, particles).                                         | no  |
 
 ## The state machine (the heart)
 

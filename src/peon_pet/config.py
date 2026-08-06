@@ -3,6 +3,8 @@
 Event -> behavior mapping lives in events.py.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from enum import StrEnum
 from importlib.resources import files
@@ -31,11 +33,66 @@ class AtlasLayout:
 
 
 @dataclass(frozen=True, slots=True)
+class Rgb:
+    """Integer channels in 0..255. Convert to Qt only at the paint edge."""
+
+    r: int
+    g: int
+    b: int
+
+    @classmethod
+    def from_hex(cls, color: str) -> Rgb:
+        s = color.removeprefix("#")
+        if len(s) != 6:
+            raise ValueError(f"expected RRGGBB hex color, got {color!r}")
+        try:
+            return cls(int(s[0:2], 16), int(s[2:4], 16), int(s[4:6], 16))
+        except ValueError:
+            raise ValueError(f"expected RRGGBB hex color, got {color!r}") from None
+
+
+@dataclass(frozen=True, slots=True)
+class Rgba:
+    rgb: Rgb
+    a: float = 1.0
+
+    @classmethod
+    def from_hex(cls, color: str, *, a: float = 1.0) -> Rgba:
+        return cls(Rgb.from_hex(color), a)
+
+    @classmethod
+    def from_rgb(cls, rgb: Rgb, *, a: float = 1.0) -> Rgba:
+        return cls(rgb, a)
+
+
+@dataclass(frozen=True, slots=True)
+class FlashConfig:
+    color: Rgba
+    decay: float
+
+
+@dataclass(frozen=True, slots=True)
+class ShakeConfig:
+    intensity: float
+    decay: float
+
+
+@dataclass(frozen=True, slots=True)
+class ParticleConfig:
+    count: int
+    duration: float
+
+
+EffectSpec = FlashConfig | ShakeConfig | ParticleConfig
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
 class AnimConfig:
     row: int
     frames: int
     fps: int
     loop: bool
+    effects: tuple[EffectSpec, ...] = ()
 
 
 # Known atlases: short name -> layout.
@@ -45,10 +102,40 @@ ATLAS_LAYOUTS: dict[str, AtlasLayout] = {
 }
 
 ANIM_CONFIG: dict[Anim, AnimConfig] = {
-    Anim.SLEEPING: AnimConfig(0, 6, 3, True),
-    Anim.WAKING: AnimConfig(1, 6, 8, False),
-    Anim.TYPING: AnimConfig(2, 6, 8, True),
-    Anim.ALARMED: AnimConfig(3, 6, 8, False),
-    Anim.CELEBRATE: AnimConfig(4, 6, 8, False),
-    Anim.ANNOYED: AnimConfig(5, 6, 8, False),
+    Anim.SLEEPING: AnimConfig(row=0, frames=6, fps=3, loop=True),
+    Anim.WAKING: AnimConfig(
+        row=1,
+        frames=6,
+        fps=8,
+        loop=False,
+        effects=(FlashConfig(Rgba.from_hex("#66CCFF", a=0.3), 2.0),),
+    ),
+    Anim.TYPING: AnimConfig(row=2, frames=6, fps=8, loop=True),
+    Anim.ALARMED: AnimConfig(
+        row=3,
+        frames=6,
+        fps=8,
+        loop=False,
+        effects=(FlashConfig(Rgba.from_hex("#FF1A1A", a=0.5), 2.5),),
+    ),
+    Anim.CELEBRATE: AnimConfig(
+        row=4,
+        frames=6,
+        fps=8,
+        loop=False,
+        effects=(
+            FlashConfig(Rgba.from_hex("#FFCC00", a=0.5), 2.0),
+            ParticleConfig(count=30, duration=1.2),
+        ),
+    ),
+    Anim.ANNOYED: AnimConfig(
+        row=5,
+        frames=6,
+        fps=8,
+        loop=False,
+        effects=(
+            FlashConfig(Rgba.from_hex("#CC6600", a=0.3), 2.0),
+            ShakeConfig(12.0, 8.0),
+        ),
+    ),
 }

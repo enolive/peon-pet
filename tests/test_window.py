@@ -7,9 +7,9 @@ from PySide6 import QtCore
 from PySide6.QtTest import QSignalSpy
 from pytestqt.qtbot import QtBot
 
-from peon_pet.config import ANIM_CONFIG, Anim
+from peon_pet.config import ANIM_CONFIG, Anim, FlashConfig, ParticleConfig
 from peon_pet.prefs import Prefs, WindowPosition
-from peon_pet.window import PetWindow, cell_rect, missing_anims
+from peon_pet.window import PetWindow, cell_rect, missing_anims, particle_to_qt
 
 
 class TestFinishedBoundary:
@@ -51,35 +51,6 @@ class TestSavedPosition:
 
         assert sut.pos().x() == 123
         assert sut.pos().y() == 456
-
-
-class TestHelperFunctions:
-    @pytest.mark.parametrize(
-        ("frame", "row"),
-        [(0, 0), (5, 2), (3, 4)],
-        ids=["top-left", "frame5-row2", "frame3-row4"],
-    )
-    def test_origin_scales_with_frame_and_row(self, frame: int, row: int) -> None:
-        cell_w = 32.0
-        cell_h = 48.0
-
-        rect = cell_rect(frame, row, cell_w, cell_h)
-
-        assert rect == QtCore.QRectF(frame * cell_w, row * cell_h, cell_w, cell_h)
-
-    def test_zero_origin_for_top_left(self) -> None:
-        rect = cell_rect(0, 0, 32.0, 48.0)
-
-        assert rect.x() == 0.0
-        assert rect.y() == 0.0
-        assert rect.width() == 32.0
-        assert rect.height() == 48.0
-
-    def test_empty_when_all_rows_fit(self) -> None:
-        assert missing_anims(6) == []
-
-    def test_lists_anims_at_or_beyond_row_count(self) -> None:
-        assert missing_anims(4) == [Anim.CELEBRATE, Anim.ANNOYED]
 
 
 class TestPlayIdempotent:
@@ -132,6 +103,91 @@ class TestPlayIdempotent:
         assert sut.anim == Anim.ALARMED
         assert sut.loop == play_forever
         assert sut.frame == 0
+
+
+class TestEffectResetOnPlay:
+    def test_switching_anim_clears_residual_effects(self, qtbot: QtBot) -> None:
+        sut = PetWindow(_make_prefs())
+        qtbot.addWidget(sut)
+        effects = sut.effects
+        sut.play(Anim.CELEBRATE, play_forever=True)
+        assert effects.particle_count > 0
+
+        sut.play(Anim.SLEEPING)
+
+        assert not effects.active
+        assert effects.sprite_offset() == (0.0, 0.0)
+        assert effects.overlays() == []
+        assert effects.flash_intensity == 0.0
+        assert effects.shake_intensity == 0.0
+        assert effects.particle_count == 0
+
+    def test_switching_anim_rearms_destination_effects(self, qtbot: QtBot) -> None:
+        sut = PetWindow(_make_prefs())
+        qtbot.addWidget(sut)
+        effects = sut.effects
+        sut.play(Anim.ANNOYED, play_forever=True)
+
+        sut.play(Anim.CELEBRATE, play_forever=True)
+
+        assert effects.shake_intensity == 0.0
+        flash = next(
+            e for e in ANIM_CONFIG[Anim.CELEBRATE].effects if isinstance(e, FlashConfig)
+        )
+        assert effects.flash_intensity == pytest.approx(flash.color.a)
+        particles = next(
+            e
+            for e in ANIM_CONFIG[Anim.CELEBRATE].effects
+            if isinstance(e, ParticleConfig)
+        )
+        assert effects.particle_count == particles.count
+
+
+class TestHelperFunctions:
+    @pytest.mark.parametrize(
+        ("frame", "row"),
+        [(0, 0), (5, 2), (3, 4)],
+        ids=["top-left", "frame5-row2", "frame3-row4"],
+    )
+    def test_origin_scales_with_frame_and_row(self, frame: int, row: int) -> None:
+        cell_w = 32.0
+        cell_h = 48.0
+
+        rect = cell_rect(frame, row, cell_w, cell_h)
+
+        assert rect == QtCore.QRectF(frame * cell_w, row * cell_h, cell_w, cell_h)
+
+    def test_zero_origin_for_top_left(self) -> None:
+        rect = cell_rect(0, 0, 32.0, 48.0)
+
+        assert rect.x() == 0.0
+        assert rect.y() == 0.0
+        assert rect.width() == 32.0
+        assert rect.height() == 48.0
+
+    def test_empty_when_all_rows_fit(self) -> None:
+        assert missing_anims(6) == []
+
+    def test_lists_anims_at_or_beyond_row_count(self) -> None:
+        assert missing_anims(4) == [Anim.CELEBRATE, Anim.ANNOYED]
+
+    def test_origin_maps_to_origin(self) -> None:
+        assert particle_to_qt(0.0, 0.0, origin_x=100.0, origin_y=100.0) == (
+            100.0,
+            100.0,
+        )
+
+    def test_y_up_becomes_y_down(self) -> None:
+        assert particle_to_qt(0, 20.0, origin_x=100.0, origin_y=100.0) == (
+            100.0,
+            80.0,
+        )
+
+    def test_x_right_becomes_x_right(self) -> None:
+        assert particle_to_qt(10.0, 0, origin_x=100.0, origin_y=100.0) == (
+            110.0,
+            100.0,
+        )
 
 
 def _make_prefs() -> Prefs:

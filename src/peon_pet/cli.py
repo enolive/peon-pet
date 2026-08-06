@@ -12,7 +12,7 @@ import logging
 import os
 import shutil
 import subprocess
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from enum import StrEnum
 from pathlib import Path
 from typing import override
@@ -83,27 +83,36 @@ def run_update() -> None:
     _ = subprocess.run(["bash"], input=script.stdout, check=True)
 
 
-def uninstall_script_path() -> Path:
-    peon = shutil.which("peon-pet")
-    if peon is not None:
-        candidate = Path(peon).resolve().parent / UNINSTALL_SCRIPT_NAME
-        if candidate.is_file():
-            return candidate
-    xdg_bin = os.environ.get("XDG_BIN_HOME")
-    if xdg_bin:
-        candidate = Path(xdg_bin) / UNINSTALL_SCRIPT_NAME
-        if candidate.is_file():
-            return candidate
-    return Path.home() / ".local" / "bin" / UNINSTALL_SCRIPT_NAME
-
-
 def run_uninstall() -> None:
-    path = uninstall_script_path()
-    if not path.is_file():
+    path = _uninstall_script_path()
+    if path is None or not path.is_file():
         raise RuntimeError(
-            f"uninstall script not found at {path}; re-run install.sh first"
+            f"uninstall script not found at {'(unknown dir)' if path is None else path}; re-run install.sh first"
         )
     os.execv(path, [str(path)])
+
+
+def _uninstall_script_path() -> Path | None:
+    def get_aside_peon() -> Path | None:
+        peon = shutil.which("peon_pet")
+        return None if peon is None else Path(peon).resolve().parent
+
+    def get_from_xdg_bin() -> Path | None:
+        xdg_bin = os.environ.get("XDG_BIN_HOME")
+        return None if xdg_bin is None else Path(xdg_bin)
+
+    def get_from_local_bin() -> Path:
+        return Path.home() / ".local" / "bin"
+
+    candidates: list[Callable[[], Path | None]] = [
+        get_aside_peon,
+        get_from_xdg_bin,
+        get_from_local_bin,
+    ]
+
+    valid_paths = (p for func in candidates if (p := func()) is not None and p.is_dir())
+    valid_path = next(valid_paths, None)
+    return None if valid_path is None else valid_path.resolve() / UNINSTALL_SCRIPT_NAME
 
 
 class _ListEventsAction(argparse.Action):
