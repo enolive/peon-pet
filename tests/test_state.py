@@ -4,6 +4,8 @@ from collections.abc import Callable
 from typing import ClassVar
 
 import pytest
+from hypothesis import given
+from hypothesis import strategies as st
 
 from peon_pet.config import Anim
 from peon_pet.events import EVENT_REACTION, Event
@@ -261,6 +263,34 @@ class TestWarmStartReactions:
         assert not sm.session_active
         assert sm.base_anim == Anim.SLEEPING
 
+    def test_post_tool_use_failure_flips_idle_like_stop(self) -> None:
+        sm, anims, _counts = _wire_state_machine_with_recording_callbacks()
+        sm.handle_event(Event.SESSION_START, "s1")
+        sm.handle_event(Event.USER_PROMPT_SUBMIT, "s1")  # ACTIVE
+        anims.clear()
+
+        sm.handle_event(Event.POST_TOOL_USE_FAILURE, "s1")  # -> IDLE, ANNOYED
+
+        assert anims == [Anim.ANNOYED]
+        assert sm.base_anim == Anim.SLEEPING
+        anims.clear()
+
+        sm.on_finished()
+
+        assert anims == [Anim.SLEEPING]
+
+    def test_post_tool_use_failure_then_resume_returns_to_typing(self) -> None:
+        sm, anims, _counts = _wire_state_machine_with_recording_callbacks()
+        sm.handle_event(Event.SESSION_START, "s1")
+        sm.handle_event(Event.USER_PROMPT_SUBMIT, "s1")  # ACTIVE
+        sm.handle_event(Event.POST_TOOL_USE_FAILURE, "s1")  # -> IDLE
+        anims.clear()
+
+        sm.handle_event(Event.PRE_TOOL_USE, "s1")  # -> ACTIVE again
+
+        assert anims == [Anim.TYPING]
+        assert sm.base_anim == Anim.TYPING
+
 
 class TestMultipleSessions:
     def test_sessions_are_started_and_ended(self) -> None:
@@ -319,6 +349,27 @@ class TestClear:
 
         assert anims == []
         assert counts == [0]
+
+
+class TestStatefulInvariants:
+    @given(
+        steps=st.lists(
+            st.tuples(
+                st.sampled_from(list(Event)),
+                st.sampled_from(["a", "b", "c"]),
+            ),
+            max_size=40,
+        )
+    )
+    def test_after_each_event_the_number_of_sessions_is_correct(
+        self, steps: list[tuple[Event, str]]
+    ) -> None:
+        sut, _anims, counts = _wire_state_machine_with_recording_callbacks()
+
+        for event, session_id in steps:
+            sut.handle_event(event, session_id)
+
+            assert len(sut.session_ids) == counts[-1]
 
 
 class TestResolveAnim:
