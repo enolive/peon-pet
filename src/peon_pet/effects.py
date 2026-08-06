@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import random
 from dataclasses import dataclass
+from functools import reduce
 from typing import Protocol, final
 
 from .config import EffectSpec, FlashConfig, ParticleConfig, Rgb, ShakeConfig
@@ -199,7 +200,7 @@ def _spawn_live(spec: EffectSpec, rng: random.Random) -> LiveEffect:
             return _LiveFlash(cfg)
         case ShakeConfig() as cfg:
             return _LiveShake(cfg, rng)
-        case ParticleConfig() as cfg:
+        case ParticleConfig() as cfg:  # pragma: no branch
             return _LiveParticles(cfg, rng)
 
 
@@ -230,39 +231,36 @@ class EffectPlayer:
         return self.active
 
     def sprite_offset(self) -> tuple[float, float]:
-        dx = 0.0
-        dy = 0.0
-        for effect in self._live:
-            ox, oy = effect.sprite_offset()
-            dx += ox
-            dy += oy
-        return dx, dy
+        def add_tuple(
+            acc: tuple[float, float], effect: LiveEffect
+        ) -> tuple[float, float]:
+            dx, dy = effect.sprite_offset()
+            return acc[0] + dx, acc[1] + dy
+
+        return reduce(add_tuple, self._live, (0.0, 0.0))
 
     def overlays(self) -> list[Overlay]:
-        out: list[Overlay] = []
-        for effect in self._live:
-            overlay = effect.overlay()
-            if overlay is not None:
-                out.append(overlay)
-        return out
+        return [
+            overlay
+            for effect in self._live
+            if (overlay := effect.overlay()) is not None
+        ]
 
     @property
     def flash_intensity(self) -> float:
-        for effect in self._live:
-            if isinstance(effect, _LiveFlash):
-                return effect.intensity
-        return 0.0
+        flash = _first_of_type(self._live, _LiveFlash)
+        return flash.intensity if flash is not None else 0.0
 
     @property
     def shake_intensity(self) -> float:
-        for effect in self._live:
-            if isinstance(effect, _LiveShake):
-                return effect.intensity
-        return 0.0
+        shake = _first_of_type(self._live, _LiveShake)
+        return shake.intensity if shake is not None else 0.0
 
     @property
     def particle_count(self) -> int:
-        for effect in self._live:
-            if isinstance(effect, _LiveParticles):
-                return effect.count
-        return 0
+        particles = _first_of_type(self._live, _LiveParticles)
+        return particles.count if particles is not None else 0
+
+
+def _first_of_type[T](items: list[LiveEffect], typ: type[T]) -> T | None:
+    return next((item for item in items if isinstance(item, typ)), None)
