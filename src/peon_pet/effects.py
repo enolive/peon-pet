@@ -248,21 +248,19 @@ class EffectPlayer:
 
     @property
     def flash_intensity(self) -> float:
-        for effect in self._live:
-            if isinstance(effect, _LiveFlash):
-                return effect.intensity
-        return 0.0
+        flash = _first_of_type(self._live, _LiveFlash)
+        return flash.intensity if flash is not None else 0.0
 
     @property
     def shake_intensity(self) -> float:
-        for effect in self._live:
-            if isinstance(effect, _LiveShake):
-                return effect.intensity
-        return 0.0
+        shake = _first_of_type(self._live, _LiveShake)
+        return shake.intensity if shake is not None else 0.0
 
     @property
     def particle_count(self) -> int:
-        for effect in self._live:
-            if isinstance(effect, _LiveParticles):
-                return effect.count
-        return 0
+        particles = _first_of_type(self._live, _LiveParticles)
+        return particles.count if particles is not None else 0
+
+
+def _first_of_type[T](items: list[LiveEffect], typ: type[T]) -> T | None:
+    return next((item for item in items if isinstance(item, typ)), None)

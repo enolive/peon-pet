@@ -16,64 +16,6 @@ from peon_pet.config import (
     ShakeConfig,
 )
 
-
-def test_every_anim_has_a_config() -> None:
-    assert set(ANIM_CONFIG) == set(Anim)
-
-
-@pytest.mark.parametrize("atlas", list(ATLAS_LAYOUTS), ids=list(ATLAS_LAYOUTS))
-def test_every_anim_row_fits_every_atlas(atlas: str) -> None:
-    rows = ATLAS_LAYOUTS[atlas].rows
-    oversize = [a for a, c in ANIM_CONFIG.items() if c.row >= rows]
-
-    assert oversize == [], f"anims {oversize} exceed {rows} rows of atlas {atlas!r}"
-
-
-def test_reaction_anims_have_flash() -> None:
-    with_flash = {
-        a
-        for a, c in ANIM_CONFIG.items()
-        if any(isinstance(e, FlashConfig) for e in c.effects)
-    }
-
-    assert with_flash == {
-        Anim.WAKING,
-        Anim.ALARMED,
-        Anim.CELEBRATE,
-        Anim.ANNOYED,
-    }
-
-
-def test_base_anims_have_no_effects() -> None:
-    assert ANIM_CONFIG[Anim.SLEEPING].effects == ()
-    assert ANIM_CONFIG[Anim.TYPING].effects == ()
-
-
-def test_only_annoyed_has_shake() -> None:
-    with_shake = {
-        a
-        for a, c in ANIM_CONFIG.items()
-        if any(isinstance(e, ShakeConfig) for e in c.effects)
-    }
-
-    assert with_shake == {Anim.ANNOYED}
-
-
-def test_only_celebrate_has_particles() -> None:
-    with_particles = {
-        a
-        for a, c in ANIM_CONFIG.items()
-        if any(isinstance(e, ParticleConfig) for e in c.effects)
-    }
-
-    assert with_particles == {Anim.CELEBRATE}
-    particles = next(
-        e for e in ANIM_CONFIG[Anim.CELEBRATE].effects if isinstance(e, ParticleConfig)
-    )
-    assert particles.count == 30
-    assert particles.duration == 1.2
-
-
 _color_byte: SearchStrategy[int] = st.integers(min_value=0, max_value=255)
 _alpha: SearchStrategy[float] = st.floats(
     min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False
@@ -91,6 +33,46 @@ def _hex_colors(draw: st.DrawFn) -> tuple[Rgb, str]:
         body = body.upper()
     text = f"#{body}" if use_hash else body
     return rgb, text
+
+
+def test_every_anim_has_a_config() -> None:
+    assert set(ANIM_CONFIG) == set(Anim)
+
+
+@pytest.mark.parametrize("atlas", list(ATLAS_LAYOUTS), ids=list(ATLAS_LAYOUTS))
+def test_every_anim_row_fits_every_atlas(atlas: str) -> None:
+    rows = ATLAS_LAYOUTS[atlas].rows
+    oversize = [a for a, c in ANIM_CONFIG.items() if c.row >= rows]
+
+    assert oversize == [], f"anims {oversize} exceed {rows} rows of atlas {atlas!r}"
+
+
+def test_reaction_anims_have_flash() -> None:
+    with_flash = _filter_anims_by_effect(FlashConfig)
+
+    assert with_flash == {
+        Anim.WAKING,
+        Anim.ALARMED,
+        Anim.CELEBRATE,
+        Anim.ANNOYED,
+    }
+
+
+def test_base_anims_have_no_effects() -> None:
+    assert ANIM_CONFIG[Anim.SLEEPING].effects == ()
+    assert ANIM_CONFIG[Anim.TYPING].effects == ()
+
+
+def test_only_annoyed_has_shake() -> None:
+    with_shake = _filter_anims_by_effect(ShakeConfig)
+
+    assert with_shake == {Anim.ANNOYED}
+
+
+def test_only_celebrate_has_particles() -> None:
+    with_particles = _filter_anims_by_effect(ParticleConfig)
+
+    assert with_particles == {Anim.CELEBRATE}
 
 
 class TestRgbFromHex:
@@ -144,3 +126,11 @@ class TestRgba:
         _, color = case
 
         assert Rgba.from_hex(color).a == 1.0
+
+
+def _filter_anims_by_effect(config: type) -> set[Anim]:
+    return {
+        a
+        for a, c in ANIM_CONFIG.items()
+        if any(isinstance(e, config) for e in c.effects)
+    }

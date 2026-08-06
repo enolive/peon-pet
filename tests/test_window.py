@@ -131,15 +131,10 @@ class TestEffectResetOnPlay:
         sut.play(Anim.CELEBRATE, play_forever=True)
 
         assert effects.shake_intensity == 0.0
-        flash = next(
-            e for e in ANIM_CONFIG[Anim.CELEBRATE].effects if isinstance(e, FlashConfig)
-        )
+        celebrate__effects = ANIM_CONFIG[Anim.CELEBRATE].effects
+        flash = next(e for e in celebrate__effects if isinstance(e, FlashConfig))
         assert effects.flash_intensity == pytest.approx(flash.color.a)
-        particles = next(
-            e
-            for e in ANIM_CONFIG[Anim.CELEBRATE].effects
-            if isinstance(e, ParticleConfig)
-        )
+        particles = next(e for e in celebrate__effects if isinstance(e, ParticleConfig))
         assert effects.particle_count == particles.count
 
 
