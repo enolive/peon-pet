@@ -3,6 +3,7 @@
 import pytest
 from hypothesis import given
 from hypothesis import strategies as st
+from hypothesis.strategies import SearchStrategy
 
 from peon_pet.config import (
     ANIM_CONFIG,
@@ -10,6 +11,7 @@ from peon_pet.config import (
     Anim,
     FlashConfig,
     ParticleConfig,
+    Rgb,
     Rgba,
     ShakeConfig,
 )
@@ -72,66 +74,73 @@ def test_only_celebrate_has_particles() -> None:
     assert particles.duration == 1.2
 
 
-class TestRgbaFromHex:
-    def test_parses_hash_prefixed_rgb(self) -> None:
-        sut = Rgba.from_hex("#66CCFF", a=0.3)
+_color_byte: SearchStrategy[int] = st.integers(min_value=0, max_value=255)
+_alpha: SearchStrategy[float] = st.floats(
+    min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False
+)
+_rgb: SearchStrategy[Rgb] = st.builds(Rgb, r=_color_byte, g=_color_byte, b=_color_byte)
 
-        assert sut.r == pytest.approx(0x66 / 255)
-        assert sut.g == pytest.approx(0xCC / 255)
-        assert sut.b == pytest.approx(0xFF / 255)
-        assert sut.a == 0.3
+
+@st.composite
+def _hex_colors(draw: st.DrawFn) -> tuple[Rgb, str]:
+    rgb = draw(_rgb)
+    use_hash = draw(st.booleans())
+    upper = draw(st.booleans())
+    body = f"{rgb.r:02x}{rgb.g:02x}{rgb.b:02x}"
+    if upper:
+        body = body.upper()
+    text = f"#{body}" if use_hash else body
+    return rgb, text
+
+
+class TestRgbFromHex:
+    def test_parses_hash_prefixed_rgb(self) -> None:
+        sut = Rgb.from_hex("#66CCFF")
+
+        assert sut == Rgb(0x66, 0xCC, 0xFF)
 
     def test_parses_without_hash(self) -> None:
-        sut = Rgba.from_hex("FFCC00", a=0.5)
+        sut = Rgb.from_hex("FFCC00")
 
-        assert sut.r == pytest.approx(1.0)
-        assert sut.g == pytest.approx(0xCC / 255)
-        assert sut.b == pytest.approx(0.0)
-        assert sut.a == 0.5
-
-    def test_default_alpha_is_opaque(self) -> None:
-        sut = Rgba.from_hex("#FFFFFF")
-
-        assert sut.a == 1.0
+        assert sut == Rgb(0xFF, 0xCC, 0x00)
 
     def test_rejects_bad_length(self) -> None:
         with pytest.raises(ValueError, match="RRGGBB"):
-            _ = Rgba.from_hex("#FFF")
+            _ = Rgb.from_hex("#FFF")
 
     @pytest.mark.parametrize(
         argnames="value", argvalues=["bullshit", "", "#GGHHII", "GGHHII"]
     )
     def test_rejects_non_hex(self, value: str) -> None:
         with pytest.raises(ValueError):
-            _ = Rgba.from_hex(value)
+            _ = Rgb.from_hex(value)
 
-    @given(
-        r=st.integers(min_value=0, max_value=255),
-        g=st.integers(min_value=0, max_value=255),
-        b=st.integers(min_value=0, max_value=255),
-        a=st.floats(
-            min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False
-        ),
-        use_hash=st.booleans(),
-        upper=st.booleans(),
-    )
-    def test_valid_hex_maps_to_channels(
-        self,
-        r: int,
-        g: int,
-        b: int,
-        a: float,
-        use_hash: bool,
-        upper: bool,
-    ) -> None:
-        body = f"{r:02x}{g:02x}{b:02x}"
-        if upper:
-            body = body.upper()
-        color = f"#{body}" if use_hash else body
+    @given(case=_hex_colors())
+    def test_valid_hex_maps_to_channels(self, case: tuple[Rgb, str]) -> None:
+        rgb, color = case
+
+        assert Rgb.from_hex(color) == rgb
+
+
+class TestRgba:
+    @given(case=_hex_colors(), a=_alpha)
+    def test_from_hex_maps_rgb_and_alpha(self, case: tuple[Rgb, str], a: float) -> None:
+        rgb, color = case
 
         sut = Rgba.from_hex(color, a=a)
 
-        assert sut.r == pytest.approx(r / 255)
-        assert sut.g == pytest.approx(g / 255)
-        assert sut.b == pytest.approx(b / 255)
+        assert sut.rgb == rgb
         assert sut.a == a
+
+    @given(rgb=_rgb, a=_alpha)
+    def test_from_rgb_preserves_parts(self, rgb: Rgb, a: float) -> None:
+        sut = Rgba.from_rgb(rgb, a=a)
+
+        assert sut.rgb is rgb
+        assert sut.a == a
+
+    @given(case=_hex_colors())
+    def test_default_alpha_is_opaque(self, case: tuple[Rgb, str]) -> None:
+        _, color = case
+
+        assert Rgba.from_hex(color).a == 1.0

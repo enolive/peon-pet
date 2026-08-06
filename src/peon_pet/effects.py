@@ -7,12 +7,12 @@ import random
 from dataclasses import dataclass
 from typing import Protocol, final
 
-from .config import EffectSpec, FlashConfig, ParticleConfig, Rgba, ShakeConfig
+from .config import EffectSpec, FlashConfig, ParticleConfig, Rgb, ShakeConfig
 
-_GOLD_RGB: tuple[tuple[float, float, float], ...] = (
-    (1.0, 0.85, 0.0),
-    (1.0, 1.0, 0.4),
-    (0.9, 0.6, 0.1),
+_GOLD_RGB: tuple[Rgb, ...] = (
+    Rgb.from_hex("#FFD900"),
+    Rgb.from_hex("#FFFF66"),
+    Rgb.from_hex("#E6991A"),
 )
 
 # Spawn band in particle space (x right, y up; origin = paint origin below).
@@ -35,14 +35,12 @@ class Particle:
     vx: float
     vy: float
     gravity: float
-    r: float
-    g: float
-    b: float
+    color: Rgb
 
 
 @dataclass(frozen=True, slots=True)
 class FlashOverlay:
-    color: Rgba
+    rgb: Rgb
     intensity: float
 
 
@@ -71,19 +69,12 @@ def burst_opacity(lifetime: float, duration: float) -> float:
     return min(1.0, lifetime / duration)
 
 
-def particle_to_qt(
-    x: float, y: float, *, origin_x: float, origin_y: float
-) -> tuple[float, float]:
-    """Particle space (y up) -> Qt widget pixels (y down)."""
-    return origin_x + x, origin_y - y
-
-
 def spawn_particles(count: int, rng: random.Random) -> list[Particle]:
     particles: list[Particle] = []
     for _ in range(count):
         angle = (rng.random() * math.pi) - math.pi / 2
         speed = _SPEED_MIN + rng.random() * _SPEED_SPAN
-        r, g, b = _GOLD_RGB[rng.randrange(len(_GOLD_RGB))]
+        color = _GOLD_RGB[rng.randrange(len(_GOLD_RGB))]
         particles.append(
             Particle(
                 x=(rng.random() - 0.5) * _SPAWN_X_SPREAD,
@@ -91,9 +82,7 @@ def spawn_particles(count: int, rng: random.Random) -> list[Particle]:
                 vx=math.cos(angle) * speed,
                 vy=abs(math.sin(angle)) * speed + _VY_BOOST,
                 gravity=_GRAVITY_BASE - rng.random() * _GRAVITY_SPAN,
-                r=r,
-                g=g,
-                b=b,
+                color=color,
             )
         )
     return particles
@@ -106,9 +95,7 @@ def step_particle(particle: Particle, dt: float) -> Particle:
         vx=particle.vx,
         vy=particle.vy + particle.gravity * dt,
         gravity=particle.gravity,
-        r=particle.r,
-        g=particle.g,
-        b=particle.b,
+        color=particle.color,
     )
 
 
@@ -125,7 +112,7 @@ class LiveEffect(Protocol):
 @final
 class _LiveFlash:
     def __init__(self, cfg: FlashConfig) -> None:
-        self._color = cfg.color
+        self._rgb = cfg.color.rgb
         self._decay = cfg.decay
         self._intensity = cfg.color.a
 
@@ -145,7 +132,7 @@ class _LiveFlash:
     def overlay(self) -> Overlay | None:
         if self._intensity <= 0.0:
             return None
-        return FlashOverlay(self._color, self._intensity)
+        return FlashOverlay(self._rgb, self._intensity)
 
 
 @final

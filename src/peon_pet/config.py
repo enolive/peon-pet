@@ -33,26 +33,36 @@ class AtlasLayout:
 
 
 @dataclass(frozen=True, slots=True)
-class Rgba:
-    """Float channels in 0..1 (legacy shader space)."""
+class Rgb:
+    """Integer channels in 0..255. Convert to Qt only at the paint edge."""
 
-    r: float
-    g: float
-    b: float
-    a: float
+    r: int
+    g: int
+    b: int
 
     @classmethod
-    def from_hex(cls, color: str, *, a: float = 1.0) -> Rgba:
+    def from_hex(cls, color: str) -> Rgb:
         s = color.removeprefix("#")
         if len(s) != 6:
             raise ValueError(f"expected RRGGBB hex color, got {color!r}")
         try:
-            r = int(s[0:2], 16) / 255.0
-            g = int(s[2:4], 16) / 255.0
-            b = int(s[4:6], 16) / 255.0
+            return cls(int(s[0:2], 16), int(s[2:4], 16), int(s[4:6], 16))
         except ValueError:
             raise ValueError(f"expected RRGGBB hex color, got {color!r}") from None
-        return cls(r, g, b, a)
+
+
+@dataclass(frozen=True, slots=True)
+class Rgba:
+    rgb: Rgb
+    a: float = 1.0
+
+    @classmethod
+    def from_hex(cls, color: str, *, a: float = 1.0) -> Rgba:
+        return cls(Rgb.from_hex(color), a)
+
+    @classmethod
+    def from_rgb(cls, rgb: Rgb, *, a: float = 1.0) -> Rgba:
+        return cls(rgb, a)
 
 
 @dataclass(frozen=True, slots=True)

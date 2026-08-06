@@ -8,14 +8,8 @@ from typing import final, override
 from PySide6 import QtCore, QtGui, QtWidgets
 from PySide6.QtGui import QPainter
 
-from .config import ANIM_CONFIG, ASSETS, ATLAS_LAYOUTS, Anim, Rgba
-from .effects import (
-    EffectPlayer,
-    FlashOverlay,
-    Particle,
-    ParticleOverlay,
-    particle_to_qt,
-)
+from .config import ANIM_CONFIG, ASSETS, ATLAS_LAYOUTS, Anim, Rgb
+from .effects import EffectPlayer, FlashOverlay, Particle, ParticleOverlay
 from .prefs import Prefs
 
 _BADGE_FG_COLOR = "white"
@@ -29,6 +23,13 @@ _PARTICLE_ORIGIN_X = 80.0
 _PARTICLE_ORIGIN_Y = 30.0
 
 logger = logging.getLogger(__name__)
+
+
+def particle_to_qt(
+    x: float, y: float, *, origin_x: float, origin_y: float
+) -> tuple[float, float]:
+    """Particle space (y up) -> Qt widget pixels (y down)."""
+    return origin_x + x, origin_y - y
 
 
 def cell_rect(frame: int, row: int, cell_w: float, cell_h: float) -> QtCore.QRectF:
@@ -263,19 +264,16 @@ class PetWindow(QtWidgets.QWidget):
         # Overlays above border (legacy flash z-order); badge stays on top.
         for overlay in self._effects.overlays():
             match overlay:
-                case FlashOverlay(color=c, intensity=intensity):
-                    self._draw_overlay(c, intensity, p)
+                case FlashOverlay(rgb=rgb, intensity=intensity):
+                    self._draw_overlay(p, rgb, intensity)
                 case ParticleOverlay(particles=particles, opacity=opacity):
                     self._draw_particles(p, particles, opacity)
 
         if self._session_count > 0:
             self._draw_badge(p)
 
-    def _draw_overlay(self, c: Rgba, intensity: float, p: QPainter):
-        p.fillRect(
-            self.rect(),
-            QtGui.QColor.fromRgbF(c.r, c.g, c.b, intensity),
-        )
+    def _draw_overlay(self, p: QPainter, rgb: Rgb, intensity: float) -> None:
+        p.fillRect(self.rect(), _qcolor(rgb, intensity))
 
     @staticmethod
     def _draw_particles(
@@ -286,8 +284,7 @@ class PetWindow(QtWidgets.QWidget):
         half = _PARTICLE_SIZE / 2.0
         p.setPen(QtCore.Qt.PenStyle.NoPen)
         for particle in particles:
-            color = QtGui.QColor.fromRgbF(particle.r, particle.g, particle.b, opacity)
-            p.setBrush(color)
+            p.setBrush(_qcolor(particle.color, opacity))
             qx, qy = particle_to_qt(
                 particle.x,
                 particle.y,
@@ -320,3 +317,8 @@ class PetWindow(QtWidgets.QWidget):
             QtCore.Qt.AlignmentFlag.AlignCenter,
             text,
         )
+
+
+def _qcolor(rgb: Rgb, a: float) -> QtGui.QColor:
+    """Rgb 0..255 + alpha 0..1 -> QColor (conversion only at the Qt edge)."""
+    return QtGui.QColor(rgb.r, rgb.g, rgb.b, max(0, min(255, round(a * 255))))

@@ -8,7 +8,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 from hypothesis.strategies import SearchStrategy
 
-from peon_pet.config import FlashConfig, ParticleConfig, Rgba, ShakeConfig
+from peon_pet.config import FlashConfig, ParticleConfig, Rgb, Rgba, ShakeConfig
 from peon_pet.effects import (
     EffectPlayer,
     FlashOverlay,
@@ -16,7 +16,6 @@ from peon_pet.effects import (
     ParticleOverlay,
     burst_opacity,
     decay_linear,
-    particle_to_qt,
     shake_offset,
     spawn_particles,
     step_particle,
@@ -98,26 +97,6 @@ class TestShakeOffset:
         assert a == b
 
 
-class TestParticleToQt:
-    def test_origin_maps_to_origin(self) -> None:
-        assert particle_to_qt(0.0, 0.0, origin_x=100.0, origin_y=100.0) == (
-            100.0,
-            100.0,
-        )
-
-    def test_y_up_becomes_y_down(self) -> None:
-        assert particle_to_qt(0, 20.0, origin_x=100.0, origin_y=100.0) == (
-            100.0,
-            80.0,
-        )
-
-    def test_x_right_becomes_x_right(self) -> None:
-        assert particle_to_qt(10.0, 0, origin_x=100.0, origin_y=100.0) == (
-            110.0,
-            100.0,
-        )
-
-
 class TestBurstOpacity:
     def test_full_at_start(self) -> None:
         assert burst_opacity(lifetime=1.2, duration=1.2) == 1.0
@@ -147,7 +126,14 @@ class TestParticles:
         assert len(spawn_particles(count, r)) == count
 
     def test_step_applies_velocity_and_gravity(self) -> None:
-        p = Particle(x=0.0, y=0.0, vx=10.0, vy=20.0, gravity=-50.0, r=1.0, g=1.0, b=0.0)
+        p = Particle(
+            x=0.0,
+            y=0.0,
+            vx=10.0,
+            vy=20.0,
+            gravity=-50.0,
+            color=Rgb(255, 255, 0),
+        )
 
         got = step_particle(p, dt=0.1)
 
