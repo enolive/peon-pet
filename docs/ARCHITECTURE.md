@@ -1,7 +1,7 @@
 # Architecture
 
 Peon Pet is a desktop pet that watches PeonPing's state file and animates a sprite in response. It's a small Python app
-(~1700 LOC including tests) with a clear split between pure logic (trivially testable) and Qt wiring (one integration
+(~2800 LOC including tests) with a clear split between pure logic (trivially testable) and Qt wiring (one integration
 test).
 
 ## The big picture

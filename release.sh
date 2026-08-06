@@ -37,6 +37,7 @@ Commit or stash unrelated changes first. Allowed: ${RELEASE_PATHS[*]}"
   done < <(git status --porcelain)
 }
 
+uv lock
 version="$(uv version --short)"
 [[ -n "$version" ]] || die "could not read version from pyproject.toml"
 tag="v${version}"

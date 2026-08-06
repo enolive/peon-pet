@@ -11,10 +11,10 @@ A desktop pet that reacts to peon-ping events. Python + PySide6.
 - When the user asks you to write some implementation, insist on a test-first approach. There are acceptable exceptions
   for that. The point is to make good development practice a habit. Deviations from it should be a deliberate choice.
   For instance:
-    - a quick proof something actually is possible
-    - something not tested yet
-    - trivial shell glue (`release.sh`, one-shot install helpers) where a pytest wrapper would only assert
-      `bash -n` / executable bits - that is ceremony, not coverage. Don't add tests just to satisfy TDD optics.
+  - a quick proof something actually is possible
+  - something not tested yet
+  - trivial shell glue (`release.sh`, one-shot install helpers) where a pytest wrapper would only assert
+    `bash -n` / executable bits - that is ceremony, not coverage. Don't add tests just to satisfy TDD optics.
 
 ### Test style
 
@@ -35,7 +35,7 @@ A desktop pet that reacts to peon-ping events. Python + PySide6.
 
 ## Tech stack
 
-- **Python >= 3.10** with **PySide6** for the GUI (frameless transparent always-on-top window)
+- **Python >= 3.12** with **PySide6** for the GUI (frameless transparent always-on-top window)
 - **uv** for project/env management (`pyproject.toml`, `uv.lock`, `.venv/`)
 - **hatchling** build backend; produces an installable wheel
 - **basedpyright** for type checking (also the LSP Zed uses)
@@ -67,9 +67,9 @@ uv run pytest                # run tests
 - Version source of truth is `pyproject.toml` only (no `__version__` mirror).
 - **Do not** create release tags, push `v*` tags, or craft GitHub Releases by hand.
 - Ask the user to do that by increasing the version in `pyproject.toml` and running `./release.sh`.
-- That script confirms with an explicit `y/N` prompt; may auto-commit `pyproject.toml` / `uv.lock` if
-  those are the only dirty files, then tags `vX.Y.Z` and pushes so CI can publish the release assets.
-  Any other dirty files abort the release.
+- That script confirms with an explicit `y/N` prompt; may auto-commit `pyproject.toml` / `uv.lock` if those are the only
+  dirty files, then tags `vX.Y.Z` and pushes so CI can publish the release assets. Any other dirty files abort the
+  release.
 
 ### Sprite atlases
 
