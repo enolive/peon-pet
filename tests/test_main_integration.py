@@ -5,16 +5,20 @@ offscreen Qt, no display, and no real peon-ping.
 """
 
 import json
+import threading
 from collections.abc import Sequence
 from pathlib import Path
+from typing import cast
 
 import pytest
 from PySide6 import QtWidgets
 from pytestqt.qtbot import QtBot
 
-from peon_pet.__main__ import run
+from peon_pet.__main__ import PROP_DEMO, PROP_WATCHER, run
 from peon_pet.cli import parse_args
 from peon_pet.config import Anim
+from peon_pet.demo import Demo
+from peon_pet.watcher import StateWatcher
 from peon_pet.window import PetWindow
 
 POLL_INTERVAL_SECONDS = 0.05
@@ -140,6 +144,52 @@ class TestDemoIntegration:
         assert win.anim == Anim.SLEEPING
 
 
+class TestBackgroundShutdown:
+    """aboutToQuit must join demo/watcher before Qt tears down the seam."""
+
+    def test_about_to_quit_stops_demo(
+        self,
+        single_instance_app: QtWidgets.QApplication,
+        qtbot: QtBot,
+        single_instance_server_name: str,
+    ) -> None:
+        win = _run(
+            single_instance_app,
+            ["--demo"],
+            single_instance_name=single_instance_server_name,
+            poll_interval_s=POLL_INTERVAL_SECONDS,
+        )
+        qtbot.addWidget(win)
+        thread = _BackgroundThread.of(single_instance_app, PROP_DEMO)
+        assert thread.is_alive()
+
+        single_instance_app.aboutToQuit.emit()
+
+        assert not thread.is_alive()
+
+    def test_about_to_quit_stops_watcher(
+        self,
+        single_instance_app: QtWidgets.QApplication,
+        qtbot: QtBot,
+        tmp_path: Path,
+        single_instance_server_name: str,
+    ) -> None:
+        state_path = tmp_path / ".state.json"
+        win = _run(
+            single_instance_app,
+            ["--watch", str(state_path)],
+            single_instance_name=single_instance_server_name,
+            poll_interval_s=POLL_INTERVAL_SECONDS,
+        )
+        qtbot.addWidget(win)
+        thread = _BackgroundThread.of(single_instance_app, PROP_WATCHER)
+        assert thread.is_alive()
+
+        single_instance_app.aboutToQuit.emit()
+
+        assert not thread.is_alive()
+
+
 def _run(
     app: QtWidgets.QApplication,
     argv: Sequence[str],
@@ -161,3 +211,20 @@ def _write_state(path: Path, event: str, sid: str, ts: float) -> None:
             {"last_active": {"event": event, "session_id": sid, "timestamp": ts}}
         )
     )
+
+
+class _BackgroundThread:
+    """Reads the daemon thread stashed on Demo/StateWatcher.
+
+    Internal: production only exposes start/stop; the race we guard is 'thread
+    still alive after aboutToQuit', which needs the Thread object itself.
+    """
+
+    @staticmethod
+    def of(app: QtWidgets.QApplication, key: str) -> threading.Thread:
+        obj = cast(Demo | StateWatcher | None, app.property(key))
+        assert obj is not None
+        # noinspection protected-member
+        thread = obj._thread  # pyright: ignore[reportPrivateUsage]
+        assert thread is not None
+        return thread

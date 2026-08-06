@@ -9,14 +9,11 @@ with its plugin manager before any test is collected or imported.
 import os
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Protocol, cast
 
 import pytest
 from PySide6 import QtNetwork, QtWidgets
 
-
-class _Stoppable(Protocol):
-    def stop(self) -> None: ...
+from peon_pet.__main__ import stop_background_threads
 
 
 def pytest_configure() -> None:
@@ -51,18 +48,14 @@ def single_instance_app() -> Iterator[QtWidgets.QApplication]:
     references crashes).
 
     The watcher/demo run daemon threads that emit a GUI-bound signal across
-    threads; `run` stops neither on its own (in production the process exit kills
-    them; in tests they'd leak into the next test and segfault on the next `run`).
-    So the fixture stops whichever `run` stashed on the app explicitly.
+    threads. Production joins them via stop_background_threads on aboutToQuit;
+    integration tests never quit the shared app, so the fixture calls the same
+    helper after each test (otherwise they leak and segfault on the next run).
     """
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     assert isinstance(app, QtWidgets.QApplication)
     yield app
-    for key in ("peon_pet_watcher", "peon_pet_demo"):
-        obj = cast(_Stoppable | None, app.property(key))
-        if obj is not None:
-            # run() stashes watcher/demo here; stop so the next test is clean.
-            obj.stop()
+    stop_background_threads(app)
 
 
 @pytest.fixture
