@@ -8,7 +8,7 @@ import signal
 import sys
 from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import final
+from typing import Final, cast, final
 
 from PySide6 import QtCore, QtNetwork, QtWidgets
 
@@ -31,6 +31,12 @@ logger = logging.getLogger(__name__)
 # Relative path under $XDG_STATE_HOME (or ~/.local/state) for the -vv debug log.
 # Root is dynamic; only the app-relative tail is a constant worth sharing with tests.
 DEBUG_LOG_REL = Path("peon-pet") / "peon-pet-debug.log"
+
+# App properties where run() stashes the live background worker. Production
+# joins via aboutToQuit; tests call stop_background_threads on the same keys.
+PROP_DEMO: Final = "peon_pet_demo"
+PROP_WATCHER: Final = "peon_pet_watcher"
+_BACKGROUND_PROPS: Final = (PROP_WATCHER, PROP_DEMO)
 
 
 def main(
@@ -90,13 +96,17 @@ def run(
     timer.start(200)
     _ = timer.timeout.connect(lambda: None)
 
+    # Demo/watcher emit Qt signals from a daemon thread. Stash on the app and
+    # join on aboutToQuit so they cannot touch the seam after Qt destroys it
+    # (Ctrl-C otherwise races into RuntimeError: Signal source has been deleted).
+    # Same stash keys the test harness uses via stop_background_threads.
     if args.demo:
         logger.info("demo mode")
         seam = _Seam(parent=app)
         play: Callable[[Anim], None] = lambda a: win.play(a, True)
         _ = seam.anim_changed.connect(play)
         demo = Demo(on_anim_changed=seam.anim_changed.emit, interval_s=poll_interval_s)
-        _ = app.setProperty("peon_pet_demo", demo)
+        _ = app.setProperty(PROP_DEMO, demo)
         demo.start()
     elif args.anim:
         anim = resolve_anim(args.anim)
@@ -118,11 +128,20 @@ def run(
             on_event=state.handle_event,
             on_tick=state.purge_expired,
         )
-        # expose the watcher for testing so we can stop it after each integration test
-        _ = app.setProperty("peon_pet_watcher", watcher)
+        _ = app.setProperty(PROP_WATCHER, watcher)
         watcher.start()
 
+    _ = app.aboutToQuit.connect(lambda: stop_background_threads(app))
+
     return win
+
+
+def stop_background_threads(app: QtWidgets.QApplication) -> None:
+    """Join demo/watcher stashed on the app, if any. Idempotent."""
+    for key in _BACKGROUND_PROPS:
+        obj = cast(Demo | StateWatcher | None, app.property(key))
+        if obj is not None:
+            obj.stop()
 
 
 def claim_single_instance(app: QtWidgets.QApplication, name: str = "peon-pet") -> None:

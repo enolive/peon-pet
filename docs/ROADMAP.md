@@ -2,25 +2,6 @@
 
 Pending work, in rough priority order.
 
-## Inspect this error that occurs on ctrl+c
-
-probably a race condition due to threading and a destroyed window
-
-window owns signal -> destroying the window tries to send the to the s
-
-```log
-Traceback (most recent call last):
-  File "/usr/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
-    self.run()
-  File "/usr/lib/python3.12/threading.py", line 1010, in run
-    self._target(*self._args, **self._kwargs)
-  File "/home/chris/Coding/opt/peon-pet/src/peon_pet/demo.py", line 56, in _run
-    self._emit()
-  File "/home/chris/Coding/opt/peon-pet/src/peon_pet/demo.py", line 59, in _emit
-    self.on_anim_changed(next(self._it))
-RuntimeError: Signal source has been deleted
-```
-
 ## Cross-platform desktop install
 
 The wheel + `uv tool install` already work everywhere; only desktop glue is Linux-only (`.desktop` / XDG). Share
