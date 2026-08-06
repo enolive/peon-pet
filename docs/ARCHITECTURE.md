@@ -119,6 +119,17 @@ significant synthetic-event plumbing. The visual behavior is covered by
 `--demo`; the state-side outcomes (position saved to `config.json`, session count, anim selection) are covered by the
 unit + integration tests.
 
+### Branch coverage and exhaustive `match`
+
+coverage.py branch mode tracks runtime control-flow arcs, not type exhaustiveness. A `match` without `case _` still has
+a fall-through exit when no case matches. For an exhaustive subject (e.g. `EffectSpec` =
+`FlashConfig | ...` in `effects._spawn_live`), that exit is unreachable under the type contract, but coverage still
+counts it as a missing branch (`N->exit` / `missing-branches=exit`). Same shape as
+[pytest-cov#533](https://github.com/pytest-dev/pytest-cov/issues/533). Related wildcard false positives were fixed in
+coverage.py; exhaustive class/enum matches without a wildcard still report this. Silence with
+`# pragma: no branch`. Inventing a default case with `assert_never()` makes this worse as this will let basedpyright
+ignore added new cases and turn them into runtime errors.
+
 ## CI
 
 `../.github/workflows/ci.yml` runs two parallel jobs on every push/PR to `main`:

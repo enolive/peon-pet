@@ -210,3 +210,53 @@ class TestEffectPlayer:
 
         assert kinds == {FlashOverlay, ParticleOverlay}
         assert sut.particle_count == 5
+
+    def test_shake_contributes_sprite_offset(self) -> None:
+        sut = EffectPlayer()
+        sut.arm((ShakeConfig(12.0, 8.0),), rng=random.Random(0))
+
+        dx, dy = sut.sprite_offset()
+
+        assert (dx, dy) != (0.0, 0.0)
+
+    def test_tick_expires_shake(self) -> None:
+        sut = EffectPlayer()
+        sut.arm((ShakeConfig(intensity=10.0, decay=10.0),), rng=random.Random(0))
+
+        still_active = sut.tick(dt=1.0)
+
+        assert still_active is False
+        assert not sut.active
+        assert sut.shake_intensity == 0.0
+        assert sut.sprite_offset() == (0.0, 0.0)
+
+    def test_tick_expires_particles(self) -> None:
+        sut = EffectPlayer()
+        sut.arm((ParticleConfig(count=5, duration=0.5),), rng=random.Random(0))
+
+        still_active = sut.tick(dt=0.5)
+
+        assert still_active is False
+        assert not sut.active
+        assert sut.particle_count == 0
+
+    def test_clear_drops_live_effects(self) -> None:
+        sut = EffectPlayer()
+        sut.arm((FlashConfig(Rgba.from_hex("#FFFFFF", a=0.5), 2.0),))
+
+        sut.clear()
+
+        assert not sut.active
+        assert sut.overlays() == []
+
+    def test_zero_intensity_flash_yields_no_overlay(self) -> None:
+        sut = EffectPlayer()
+        sut.arm((FlashConfig(Rgba.from_hex("#FFFFFF", a=0.0), 2.0),))
+
+        assert sut.overlays() == []
+
+    def test_zero_duration_particles_yield_no_overlay(self) -> None:
+        sut = EffectPlayer()
+        sut.arm((ParticleConfig(count=5, duration=0.0),), rng=random.Random(0))
+
+        assert sut.overlays() == []
