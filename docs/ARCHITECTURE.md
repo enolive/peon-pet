@@ -54,6 +54,15 @@ of known sessions, each IDLE or ACTIVE, and translates peon-ping events into a t
 **Base anim** is `TYPING` if any session is ACTIVE, else `SLEEPING`. After a one-shot reaction plays out,
 `PetWindow.finished` -> `state.on_finished()` -> settle to base.
 
+**PostToolUseFailure as task-idle:** peon-ping's `PostToolUseFailure` is ambiguous - it fires both for a
+genuine mid-session tool error and for a session that ended without a preceding `Stop`. The event carries no payload
+to tell the two apart at arrival time. We treat it as a task-idle event (same as `Stop`) so the terminal case settles
+to `SLEEPING` instead of typing until TTL. The tradeoff: a genuine mid-session tool failure briefly sleeps until the
+next activity event wakes the session. In practice this flicker is invisible because peon-ping fires `PreToolUse` at
+the start of the next tool call, which arrives within the agent's dispatch gap (sub-second in agentic loops). A
+deferred-idle grace window could resolve the ambiguity but isn't worth the extra state and timer; the overload's cost
+is accepted.
+
 **Cold start:** the watcher replays the last event on startup with an empty registry. A cold event that registers a
 session announces `WAKING` (regardless of its own reaction) so a cold `Stop` doesn't spuriously celebrate. A cold
 `SessionEnd` (nothing to wake) falls through to base.

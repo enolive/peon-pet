@@ -48,7 +48,14 @@ _TASK_ACTIVE_EVENTS: frozenset[Event] = frozenset(
 
 # Events that flip a session's task to IDLE (-> SLEEPING). Stop completes the
 # current task but does not end the session.
-_TASK_IDLE_EVENTS: frozenset[Event] = frozenset({Event.STOP})
+# PostToolUseFailure is overloaded by peon-ping: it also signals a session ended
+# without a preceding Stop. Treating it as IDLE (like Stop) means a terminal
+# failure settles to SLEEPING instead of typing until TTL; the cost is a brief
+# sleep after a genuine mid-session tool failure until the next activity event
+# wakes the session again.
+_TASK_IDLE_EVENTS: frozenset[Event] = frozenset(
+    {Event.STOP, Event.POST_TOOL_USE_FAILURE}
+)
 
 # Events that end a session (-> removed from registry). Only SessionEnd.
 _SESSION_END_EVENTS: frozenset[Event] = frozenset({Event.SESSION_END})
