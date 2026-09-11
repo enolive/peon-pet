@@ -190,6 +190,25 @@ class TestBackgroundShutdown:
         assert not thread.is_alive()
 
 
+class TestVisibility:
+    def test_starts_visible_by_default(
+        self,
+        single_instance_app: QtWidgets.QApplication,
+        qtbot: QtBot,
+        single_instance_server_name: str,
+    ) -> None:
+        # No config written -> cold start -> default visible.
+        win = _run(
+            single_instance_app,
+            ["--demo"],
+            single_instance_name=single_instance_server_name,
+            poll_interval_s=POLL_INTERVAL_SECONDS,
+        )
+        qtbot.addWidget(win)
+
+        assert win.isVisible()
+
+
 def _run(
     app: QtWidgets.QApplication,
     argv: Sequence[str],

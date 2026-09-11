@@ -42,7 +42,7 @@ file and drives the state machine. The state machine is pure Python (no Qt); it 
 | `events.py`   | `Event` enum + `EVENT_REACTION`/`KNOWN_EVENTS` — the peon-ping event vocabulary shared across modules.                 | no  |
 | `watcher.py`  | `StateWatcher` — polls `.state.json` (mtime-based), parses to typed `Event`, `on_tick` each interval. Daemon thread.   | no  |
 | `demo.py`     | `Demo` — cycles every `Anim` forever on a daemon thread. Visual QA mode.                                               | no  |
-| `prefs.py`    | `Prefs` + `WindowPosition` — reads/validates `$XDG_CONFIG_HOME/peon-pet/config.json`.                                  | no  |
+| `prefs.py`    | `Prefs` + `Window` — reads/validates `$XDG_CONFIG_HOME/peon-pet/config.json`.                                          | no  |
 | `config.py`   | Static data: `Anim` enum, `ATLAS_LAYOUTS`, `ANIM_CONFIG` (playback + `effects` tuple of specs).                        | no  |
 | `effects.py`  | Pure effect helpers + `EffectPlayer` / live effects (flash, shake, particles).                                         | no  |
 

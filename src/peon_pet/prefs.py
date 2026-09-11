@@ -41,7 +41,7 @@ def _read() -> _PrefsModel:
 
 
 @final
-class WindowPosition:
+class Window:
     """Volatile window position - read on start, written on drag.
 
     Pure `(x, y)` ints (no Qt types); the window converts to/from QPoint.
@@ -49,19 +49,19 @@ class WindowPosition:
     merges the new position, and writes.
     """
 
-    def __init__(self, position: tuple[int, int] | None) -> None:
+    def __init__(self, position: tuple[int, int, bool] | None) -> None:
         self.position = position
 
     @property
-    def current(self) -> tuple[int, int] | None:
+    def current(self) -> tuple[int, int, bool] | None:
         return self.position
 
-    def save(self, pos: tuple[int, int]) -> None:
+    def save(self, pos: tuple[int, int, bool]) -> None:
         self.position = pos
         p = _config_path()
         p.parent.mkdir(parents=True, exist_ok=True)
         data = _read()
-        data.window = _WindowPositionModel(x=pos[0], y=pos[1])
+        data.window = _WindowModel(x=pos[0], y=pos[1], visible=pos[2])
         self._atomic_write(p, data.model_dump_json(indent=2))
 
     @staticmethod
@@ -80,7 +80,7 @@ class Prefs:
         data = _read()
         self.atlas = self._resolve_atlas(data)
         self.loops = data.loops
-        self.position = WindowPosition(self._resolve_position(data))
+        self.window = Window(self._resolve_position(data))
 
     @staticmethod
     def _resolve_atlas(data: _PrefsModel) -> str:
@@ -91,22 +91,23 @@ class Prefs:
         raise ValueError(f"config 'atlas' {a!r} is not valid; available: {available}")
 
     @staticmethod
-    def _resolve_position(data: _PrefsModel) -> tuple[int, int] | None:
+    def _resolve_position(data: _PrefsModel) -> tuple[int, int, bool] | None:
         if data.window is None:
             return None
-        return data.window.x, data.window.y
+        return data.window.x, data.window.y, data.window.visible
 
 
 class _PrefsModel(BaseModel):
     atlas: str = DEFAULT_ATLAS
     loops: int = Field(gt=0, default=DEFAULT_LOOPS, strict=True)
-    window: _WindowPositionModel | None = None
+    window: _WindowModel | None = None
 
     @staticmethod
     def default() -> _PrefsModel:
         return _PrefsModel(atlas=DEFAULT_ATLAS, loops=DEFAULT_LOOPS, window=None)
 
 
-class _WindowPositionModel(BaseModel):
+class _WindowModel(BaseModel):
     x: int = Field(strict=True)
     y: int = Field(strict=True)
+    visible: bool = Field(strict=True)

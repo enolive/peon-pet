@@ -17,7 +17,7 @@ def test_defaults_when_config_absent(
 
     assert sut.atlas == DEFAULT_ATLAS
     assert sut.loops == DEFAULT_LOOPS
-    assert sut.position.current is None
+    assert sut.window.current is None
 
 
 def test_defaults_when_config_is_malformed(
@@ -30,7 +30,7 @@ def test_defaults_when_config_is_malformed(
 
     assert sut.atlas == DEFAULT_ATLAS
     assert sut.loops == DEFAULT_LOOPS
-    assert sut.position.current is None
+    assert sut.window.current is None
 
 
 def test_defaults_when_config_is_not_a_dict_json(
@@ -43,7 +43,7 @@ def test_defaults_when_config_is_not_a_dict_json(
 
     assert sut.atlas == DEFAULT_ATLAS
     assert sut.loops == DEFAULT_LOOPS
-    assert sut.position.current is None
+    assert sut.window.current is None
 
 
 def test_reads_valid_atlas(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -95,13 +95,13 @@ def test_position_save_round_trip(
 ) -> None:
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
     sut = Prefs()
-    assert sut.position.current is None
+    assert sut.window.current is None
 
-    sut.position.save((123, 456))
+    sut.window.save((123, 456, False))
 
-    assert sut.position.current == (123, 456)
+    assert sut.window.current == (123, 456, False)
     re_read = Prefs()
-    assert re_read.position.current == (123, 456)
+    assert re_read.window.current == (123, 456, False)
 
 
 def test_position_save_preserves_other_settings(
@@ -111,12 +111,12 @@ def test_position_save_preserves_other_settings(
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
     sut = Prefs()
 
-    sut.position.save((10, 20))
+    sut.window.save((10, 20, False))
 
     re_read = Prefs()
     assert re_read.atlas == "orc"
     assert re_read.loops == 5
-    assert re_read.position.current == (10, 20)
+    assert re_read.window.current == (10, 20, False)
 
 
 @pytest.mark.parametrize(
@@ -138,7 +138,7 @@ def test_position_defaults_to_none_on_invalid_window_object(
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
     sut = Prefs()
 
-    assert sut.position.current is None
+    assert sut.window.current is None
 
 
 def _write_config(tmp_path: Path, data: dict[str, object]) -> None:

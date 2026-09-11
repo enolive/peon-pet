@@ -8,7 +8,7 @@ from PySide6.QtTest import QSignalSpy
 from pytestqt.qtbot import QtBot
 
 from peon_pet.config import ANIM_CONFIG, Anim, FlashConfig, ParticleConfig
-from peon_pet.prefs import Prefs, WindowPosition
+from peon_pet.prefs import Prefs, Window
 from peon_pet.window import PetWindow, cell_rect, missing_anims, particle_to_qt
 
 
@@ -41,16 +41,36 @@ class TestFinishedBoundary:
         assert finished_spy.count() == 0
 
 
-class TestSavedPosition:
+class TestSavedWindow:
     def test_restores_saved_position_on_construction(self, qtbot: QtBot) -> None:
         prefs = _make_prefs()
-        prefs.position = WindowPosition((123, 456))
+        prefs.window = Window((123, 456, False))
 
         sut = PetWindow(prefs)
         qtbot.addWidget(sut)
 
         assert sut.pos().x() == 123
         assert sut.pos().y() == 456
+
+    def test_restores_hidden_window(self, qtbot: QtBot) -> None:
+        prefs = _make_prefs()
+        prefs.window = Window((123, 456, False))
+        sut = PetWindow(prefs)
+        qtbot.addWidget(sut)
+
+        sut.restore_visibility()
+
+        assert sut.isVisible() == False
+
+    def test_restores_visible_window(self, qtbot: QtBot) -> None:
+        prefs = _make_prefs()
+        prefs.window = Window((123, 456, True))
+        sut = PetWindow(prefs)
+        qtbot.addWidget(sut)
+
+        sut.restore_visibility()
+
+        assert sut.isVisible() == True
 
 
 class TestPlayIdempotent:

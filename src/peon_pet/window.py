@@ -102,16 +102,27 @@ class PetWindow(QtWidgets.QWidget):
         _ = self._effect_timer.timeout.connect(self._tick_effects)
         self.play(start_anim)
 
-        # Position: saved overrides the default bottom-left corner.
-        saved = prefs.position.current
+        # Position: saved overrides the default bottom-left corner. Visibility
+        # is intentionally NOT applied here - the wiring layer in `__main__`
+        # reads `should_show` and decides whether to call `show()`. Setting
+        # it here would race with that call.
+        saved = prefs.window.current
         if saved is not None:
-            pt = QtCore.QPoint(*saved)
+            (x, y, _visible) = saved
+            pt = QtCore.QPoint(x, y)
             if QtWidgets.QApplication.screenAt(pt) is not None:
                 self.move(pt)
             else:
                 self._move_default()
         else:
             self._move_default()
+
+    def restore_visibility(self):
+        should_show: bool = (
+            self._prefs.window.current is None or self._prefs.window.current[2]
+        )
+        if should_show:
+            self.show()
 
     @property
     def anim(self) -> Anim | None:
@@ -206,6 +217,7 @@ class PetWindow(QtWidgets.QWidget):
 
     def toggle_visibility(self) -> None:
         self.setVisible(not self.isVisible())
+        self._save_current_position()
 
     def set_session_count(self, count: int) -> None:
         """Update the active-session badge. Only repaints if it changed."""
@@ -238,7 +250,7 @@ class PetWindow(QtWidgets.QWidget):
             and self._drag_offset is not None
         ):
             self._drag_offset = None
-            self._prefs.position.save((self.pos().x(), self.pos().y()))
+            self._save_current_position()
             event.accept()
 
     @override
@@ -317,6 +329,9 @@ class PetWindow(QtWidgets.QWidget):
             QtCore.Qt.AlignmentFlag.AlignCenter,
             text,
         )
+
+    def _save_current_position(self):
+        self._prefs.window.save((self.pos().x(), self.pos().y(), self.isVisible()))
 
 
 def _qcolor(rgb: Rgb, a: float) -> QtGui.QColor:

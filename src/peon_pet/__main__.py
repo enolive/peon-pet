@@ -83,7 +83,7 @@ def run(
     claim_single_instance(app, name=single_instance_name)
 
     win = PetWindow(prefs)
-    win.show()
+    win.restore_visibility()
 
     tray = TrayIcon(app)
     _ = tray.on_toggle_visibility.connect(win.toggle_visibility)
