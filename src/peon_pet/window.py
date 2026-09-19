@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 def particle_to_qt(
-        x: float, y: float, *, origin_x: float, origin_y: float
+    x: float, y: float, *, origin_x: float, origin_y: float
 ) -> tuple[float, float]:
     """Particle space (y up) -> Qt widget pixels (y down)."""
     return origin_x + x, origin_y - y
@@ -58,9 +58,9 @@ class PetWindow(QtWidgets.QWidget):
     finished = QtCore.Signal()
 
     def __init__(
-            self,
-            prefs: Prefs,
-            start_anim: Anim = Anim.SLEEPING,
+        self,
+        prefs: Prefs,
+        start_anim: Anim = Anim.SLEEPING,
     ) -> None:
         super().__init__()
         self._row = 0
@@ -119,7 +119,7 @@ class PetWindow(QtWidgets.QWidget):
 
     def restore_visibility(self):
         should_show: bool = (
-                self._prefs.window.current is None or self._prefs.window.current[2]
+            self._prefs.window.current is None or self._prefs.window.current[2]
         )
         if should_show:
             self.show()
@@ -227,15 +227,15 @@ class PetWindow(QtWidgets.QWidget):
     def mousePressEvent(self, event: QtGui.QMouseEvent) -> None:
         if event.button() == QtCore.Qt.MouseButton.LeftButton:
             self._drag_offset = (
-                    event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+                event.globalPosition().toPoint() - self.frameGeometry().topLeft()
             )
             event.accept()
 
     @override
     def mouseMoveEvent(self, event: QtGui.QMouseEvent) -> None:
         if (
-                self._drag_offset is not None
-                and event.buttons() & QtCore.Qt.MouseButton.LeftButton
+            self._drag_offset is not None
+            and event.buttons() & QtCore.Qt.MouseButton.LeftButton
         ):
             self.move(event.globalPosition().toPoint() - self._drag_offset)
             event.accept()
@@ -243,8 +243,8 @@ class PetWindow(QtWidgets.QWidget):
     @override
     def mouseReleaseEvent(self, event: QtGui.QMouseEvent) -> None:
         if (
-                event.button() == QtCore.Qt.MouseButton.LeftButton
-                and self._drag_offset is not None
+            event.button() == QtCore.Qt.MouseButton.LeftButton
+            and self._drag_offset is not None
         ):
             self._drag_offset = None
             self._save_current_position()
@@ -286,9 +286,9 @@ class PetWindow(QtWidgets.QWidget):
 
     @staticmethod
     def _draw_particles(
-            p: QtGui.QPainter,
-            particles: tuple[Particle, ...],
-            opacity: float,
+        p: QtGui.QPainter,
+        particles: tuple[Particle, ...],
+        opacity: float,
     ) -> None:
         half = _PARTICLE_SIZE / 2.0
         p.setPen(QtCore.Qt.PenStyle.NoPen)
