@@ -27,12 +27,13 @@ class TestFinishedBoundary:
         assert finished_spy.count() == 1
         assert sut.frame == cfg.frames - 1
 
-    def test_looping_anim_never_emits_finished(self, qtbot: QtBot) -> None:
+    @pytest.mark.parametrize("anim", [Anim.TYPING, Anim.SLEEPING, Anim.ALARMED])
+    def test_looping_anim_never_emits_finished(self, qtbot: QtBot, anim: Anim) -> None:
         prefs = _make_prefs()
         sut = PetWindow(prefs)
         qtbot.addWidget(sut)
-        sut.play(Anim.TYPING)  # looping
-        cfg = ANIM_CONFIG[Anim.TYPING]
+        sut.play(anim)
+        cfg = ANIM_CONFIG[anim]
         finished_spy = QSignalSpy(sut.finished)
 
         for _ in range(cfg.frames * sut.loops):
