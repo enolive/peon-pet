@@ -69,6 +69,13 @@ def test_only_annoyed_has_shake() -> None:
     assert with_shake == {Anim.ANNOYED}
 
 
+def test_sticky_animations_play_forever() -> None:
+    looping = {a for a, c in ANIM_CONFIG.items() if c.loop}
+
+    assert looping == {Anim.SLEEPING, Anim.TYPING,
+                       Anim.ALARMED}, "base anims plus alarmed which should not be obfuscated"
+
+
 def test_only_celebrate_has_particles() -> None:
     with_particles = _filter_anims_by_effect(ParticleConfig)
 

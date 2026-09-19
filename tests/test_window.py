@@ -114,13 +114,14 @@ class TestPlayIdempotent:
     ) -> None:
         sut = PetWindow(_make_prefs())
         qtbot.addWidget(sut)
-        sut.play(Anim.ALARMED, play_forever=not play_forever)
+        animation = Anim.ANNOYED
+        sut.play(animation, play_forever=not play_forever)
         sut.advance()
         sut.advance()
 
-        sut.play(Anim.ALARMED, play_forever=play_forever)
+        sut.play(animation, play_forever=play_forever)
 
-        assert sut.anim == Anim.ALARMED
+        assert sut.anim == animation
         assert sut.loop == play_forever
         assert sut.frame == 0
 

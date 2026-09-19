@@ -115,7 +115,7 @@ ANIM_CONFIG: dict[Anim, AnimConfig] = {
         row=3,
         frames=6,
         fps=8,
-        loop=False,
+        loop=True,
         effects=(FlashConfig(Rgba.from_hex("#FF1A1A", a=0.5), 2.5),),
     ),
     Anim.CELEBRATE: AnimConfig(
