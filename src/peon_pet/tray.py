@@ -18,12 +18,20 @@ from .config import ICONS
 class TrayIcon(QtWidgets.QSystemTrayIcon):
     on_toggle_visibility = QtCore.Signal()
     on_reset_to_idle = QtCore.Signal()
+    on_set_opacity = QtCore.Signal(float)
 
     def __init__(self, app: QtWidgets.QApplication) -> None:
         super().__init__(QtGui.QIcon(str(ICONS / "peon-pet-tray.png")), app)
         self.setToolTip("Peon Pet")
         menu = QtWidgets.QMenu()
+        opacity_menu = QtWidgets.QMenu("Opacity")
+        opacities = {"20%": 0.2, "40%": 0.4, "60%": 0.6, "80%": 0.8, "100%": 1.0}
+        for name, value in opacities.items():
+            _ = opacity_menu.addAction(
+                name, lambda o=value: self.on_set_opacity.emit(o)
+            )
         _ = menu.addAction("Show/Hide", self.on_toggle_visibility.emit)
+        _ = menu.addMenu(opacity_menu)
         _ = menu.addAction("Clear all sessions", self.on_reset_to_idle.emit)
         _ = menu.addSeparator()
         _ = menu.addAction("About", show_about)

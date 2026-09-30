@@ -10,7 +10,7 @@ from PySide6.QtGui import QPainter
 
 from .config import ANIM_CONFIG, ASSETS, ATLAS_LAYOUTS, Anim, Rgb
 from .effects import EffectPlayer, FlashOverlay, Particle, ParticleOverlay
-from .prefs import Prefs
+from .prefs import Prefs, WindowState
 
 _BADGE_FG_COLOR = "white"
 _BADGE_BG_COLOR = "#0c6d1a"
@@ -108,21 +108,25 @@ class PetWindow(QtWidgets.QWidget):
         # it here would race with that call.
         saved = prefs.window.current
         if saved is not None:
-            (x, y, _visible) = saved
-            pt = QtCore.QPoint(x, y)
+            pt = QtCore.QPoint(saved.x, saved.y)
             if QtWidgets.QApplication.screenAt(pt) is not None:
                 self.move(pt)
             else:
                 self._move_default()
         else:
             self._move_default()
+        if saved is not None:
+            self.setWindowOpacity(saved.opacity)
 
     def restore_visibility(self):
-        should_show: bool = (
-            self._prefs.window.current is None or self._prefs.window.current[2]
-        )
+        state = self._prefs.window.current
+        should_show: bool = state is None or state.visible
         if should_show:
             self.show()
+
+    def set_opacity(self, opacity: float) -> None:
+        self.setWindowOpacity(opacity)
+        self._save_current_state()
 
     @property
     def anim(self) -> Anim | None:
@@ -214,7 +218,7 @@ class PetWindow(QtWidgets.QWidget):
 
     def toggle_visibility(self) -> None:
         self.setVisible(not self.isVisible())
-        self._save_current_position()
+        self._save_current_state()
 
     def set_session_count(self, count: int) -> None:
         """Update the active-session badge. Only repaints if it changed."""
@@ -247,7 +251,7 @@ class PetWindow(QtWidgets.QWidget):
             and self._drag_offset is not None
         ):
             self._drag_offset = None
-            self._save_current_position()
+            self._save_current_state()
             event.accept()
 
     @override
@@ -327,8 +331,12 @@ class PetWindow(QtWidgets.QWidget):
             text,
         )
 
-    def _save_current_position(self):
-        self._prefs.window.save((self.pos().x(), self.pos().y(), self.isVisible()))
+    def _save_current_state(self):
+        raw_opacity = self.windowOpacity()
+        new_state = WindowState(
+            self.pos().x(), self.pos().y(), self.isVisible(), round(raw_opacity, 1)
+        )
+        self._prefs.window.save(new_state)
 
 
 def _qcolor(rgb: Rgb, a: float) -> QtGui.QColor:
