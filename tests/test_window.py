@@ -8,7 +8,7 @@ from PySide6.QtTest import QSignalSpy
 from pytestqt.qtbot import QtBot
 
 from peon_pet.config import ANIM_CONFIG, Anim, FlashConfig, ParticleConfig
-from peon_pet.prefs import Prefs, Window
+from peon_pet.prefs import Prefs, Window, WindowState
 from peon_pet.window import PetWindow, cell_rect, missing_anims, particle_to_qt
 
 
@@ -45,7 +45,8 @@ class TestFinishedBoundary:
 class TestSavedWindow:
     def test_restores_saved_position_on_construction(self, qtbot: QtBot) -> None:
         prefs = _make_prefs()
-        prefs.window = Window((123, 456, False))
+        state = WindowState(123, 456, False, 1.0)
+        prefs.window = Window(state)
 
         sut = PetWindow(prefs)
         qtbot.addWidget(sut)
@@ -55,7 +56,8 @@ class TestSavedWindow:
 
     def test_restores_hidden_window(self, qtbot: QtBot) -> None:
         prefs = _make_prefs()
-        prefs.window = Window((123, 456, False))
+        state = WindowState(123, 456, False, 1.0)
+        prefs.window = Window(state)
         sut = PetWindow(prefs)
         qtbot.addWidget(sut)
 
@@ -65,13 +67,42 @@ class TestSavedWindow:
 
     def test_restores_visible_window(self, qtbot: QtBot) -> None:
         prefs = _make_prefs()
-        prefs.window = Window((123, 456, True))
+        state = WindowState(123, 456, True, 1.0)
+        prefs.window = Window(state)
         sut = PetWindow(prefs)
         qtbot.addWidget(sut)
 
         sut.restore_visibility()
 
         assert sut.isVisible() == True
+
+    @pytest.mark.parametrize("opacity", [0.1, 0.5, 1.0])
+    def test_changes_window_opacity(self, qtbot: QtBot, opacity: float) -> None:
+        prefs = _make_prefs()
+        state = WindowState(123, 456, True, 0.3)
+        prefs.window = Window(state)
+        sut = PetWindow(prefs)
+        qtbot.addWidget(sut)
+
+        sut.set_opacity(opacity)
+
+        assert sut.windowOpacity() == pytest.approx(opacity, abs=1 / 255)
+        assert prefs.window.current is not None
+        # noinspection unresolved-references
+        assert prefs.window.current.opacity == opacity
+
+    @pytest.mark.parametrize("opacity", [0.1, 0.5, 1.0])
+    def test_changes_window_opacity_on_construction(
+        self, qtbot: QtBot, opacity: float
+    ) -> None:
+        prefs = _make_prefs()
+        state = WindowState(123, 456, True, opacity)
+        prefs.window = Window(state)
+
+        sut = PetWindow(prefs)
+        qtbot.addWidget(sut)
+
+        assert sut.windowOpacity() == pytest.approx(opacity, abs=1 / 255)
 
 
 class TestPlayIdempotent:

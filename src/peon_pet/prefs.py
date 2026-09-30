@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import os
+from dataclasses import dataclass
 from pathlib import Path
 from typing import final
 
@@ -42,26 +43,28 @@ def _read() -> _PrefsModel:
 
 @final
 class Window:
-    """Volatile window position - read on start, written on drag.
+    """Volatile window state - read on start, written on drag/show hide.
 
     Pure `(x, y)` ints (no Qt types); the window converts to/from QPoint.
     `current` is the snapshot from Prefs construction; `save` re-reads the file,
     merges the new position, and writes.
     """
 
-    def __init__(self, position: tuple[int, int, bool] | None) -> None:
-        self.position = position
+    def __init__(self, state: WindowState | None) -> None:
+        self.state = state
 
     @property
-    def current(self) -> tuple[int, int, bool] | None:
-        return self.position
+    def current(self) -> WindowState | None:
+        return self.state
 
-    def save(self, pos: tuple[int, int, bool]) -> None:
-        self.position = pos
+    def save(self, state: WindowState) -> None:
+        self.state = state
         p = _config_path()
         p.parent.mkdir(parents=True, exist_ok=True)
         data = _read()
-        data.window = _WindowModel(x=pos[0], y=pos[1], visible=pos[2])
+        data.window = _WindowModel(
+            x=state.x, y=state.y, visible=state.visible, opacity=state.opacity
+        )
         self._atomic_write(p, data.model_dump_json(indent=2))
 
     @staticmethod
@@ -74,13 +77,22 @@ class Window:
         os.replace(tmp, path)
 
 
+@dataclass(frozen=True)
+@final
+class WindowState:
+    x: int
+    y: int
+    visible: bool
+    opacity: float
+
+
 @final
 class Prefs:
     def __init__(self) -> None:
         data = _read()
         self.atlas = self._resolve_atlas(data)
         self.loops = data.loops
-        self.window = Window(self._resolve_position(data))
+        self.window = Window(self._resolve_state(data))
 
     @staticmethod
     def _resolve_atlas(data: _PrefsModel) -> str:
@@ -91,10 +103,15 @@ class Prefs:
         raise ValueError(f"config 'atlas' {a!r} is not valid; available: {available}")
 
     @staticmethod
-    def _resolve_position(data: _PrefsModel) -> tuple[int, int, bool] | None:
+    def _resolve_state(data: _PrefsModel) -> WindowState | None:
         if data.window is None:
             return None
-        return data.window.x, data.window.y, data.window.visible
+        return WindowState(
+            x=data.window.x,
+            y=data.window.y,
+            visible=data.window.visible,
+            opacity=data.window.opacity,
+        )
 
 
 class _PrefsModel(BaseModel):
@@ -111,3 +128,4 @@ class _WindowModel(BaseModel):
     x: int = Field(strict=True)
     y: int = Field(strict=True)
     visible: bool = Field(strict=True)
+    opacity: float = Field(gt=0, le=1, default=1.0, strict=True)

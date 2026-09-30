@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from peon_pet.prefs import DEFAULT_ATLAS, DEFAULT_LOOPS, Prefs
+from peon_pet.prefs import DEFAULT_ATLAS, DEFAULT_LOOPS, Prefs, WindowState
 
 
 def test_defaults_when_config_absent(
@@ -90,18 +90,20 @@ def test_loops_defaults_when_invalid(
     assert sut.loops == DEFAULT_LOOPS
 
 
+@pytest.mark.parametrize("opacity", [0.1, 0.5, 1.0])
 def test_position_save_round_trip(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    opacity: float, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
     sut = Prefs()
     assert sut.window.current is None
+    state = WindowState(123, 456, False, opacity)
 
-    sut.window.save((123, 456, False))
+    sut.window.save(state)
 
-    assert sut.window.current == (123, 456, False)
+    assert sut.window.current == state
     re_read = Prefs()
-    assert re_read.window.current == (123, 456, False)
+    assert re_read.window.current == state
 
 
 def test_position_save_preserves_other_settings(
@@ -110,13 +112,14 @@ def test_position_save_preserves_other_settings(
     _write_config(tmp_path, {"atlas": "orc", "loops": 5})
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
     sut = Prefs()
+    state = WindowState(10, 20, False, 0.2)
 
-    sut.window.save((10, 20, False))
+    sut.window.save(state)
 
     re_read = Prefs()
     assert re_read.atlas == "orc"
     assert re_read.loops == 5
-    assert re_read.window.current == (10, 20, False)
+    assert re_read.window.current == state
 
 
 @pytest.mark.parametrize(
