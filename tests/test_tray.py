@@ -65,21 +65,5 @@ def test_clear_sessions_emits_signal(
     assert spy.count() == 1
 
 
-def test_opacity_menu_emits_each_preset(
-    single_instance_app: QtWidgets.QApplication,
-) -> None:
-    sut = TrayIcon(single_instance_app)
-    opacity_action = _find_context_menu_action_by_text(sut, "Opacity")
-    opacity_menu = opacity_action.menu()
-    assert isinstance(opacity_menu, QtWidgets.QMenu)
-    emitted: list[float] = []
-    _ = sut.on_set_opacity.connect(emitted.append)
-
-    for action in opacity_menu.actions():
-        action.trigger()
-
-    assert sorted(emitted) == [0.2, 0.4, 0.6, 0.8, 1.0]
-
-
 def _find_context_menu_action_by_text(sut: TrayIcon, label_text: str) -> QAction:
     return next(a for a in sut.contextMenu().actions() if a.text() == label_text)

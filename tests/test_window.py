@@ -45,7 +45,7 @@ class TestFinishedBoundary:
 class TestSavedWindow:
     def test_restores_saved_position_on_construction(self, qtbot: QtBot) -> None:
         prefs = _make_prefs()
-        state = WindowState(123, 456, False, 1.0)
+        state = WindowState(123, 456, False)
         prefs.window = Window(state)
 
         sut = PetWindow(prefs)
@@ -56,7 +56,7 @@ class TestSavedWindow:
 
     def test_restores_hidden_window(self, qtbot: QtBot) -> None:
         prefs = _make_prefs()
-        state = WindowState(123, 456, False, 1.0)
+        state = WindowState(123, 456, False)
         prefs.window = Window(state)
         sut = PetWindow(prefs)
         qtbot.addWidget(sut)
@@ -67,7 +67,7 @@ class TestSavedWindow:
 
     def test_restores_visible_window(self, qtbot: QtBot) -> None:
         prefs = _make_prefs()
-        state = WindowState(123, 456, True, 1.0)
+        state = WindowState(123, 456, True)
         prefs.window = Window(state)
         sut = PetWindow(prefs)
         qtbot.addWidget(sut)
@@ -75,34 +75,6 @@ class TestSavedWindow:
         sut.restore_visibility()
 
         assert sut.isVisible() == True
-
-    @pytest.mark.parametrize("opacity", [0.1, 0.5, 1.0])
-    def test_changes_window_opacity(self, qtbot: QtBot, opacity: float) -> None:
-        prefs = _make_prefs()
-        state = WindowState(123, 456, True, 0.3)
-        prefs.window = Window(state)
-        sut = PetWindow(prefs)
-        qtbot.addWidget(sut)
-
-        sut.set_opacity(opacity)
-
-        assert sut.windowOpacity() == pytest.approx(opacity, abs=1 / 255)
-        assert prefs.window.current is not None
-        # noinspection unresolved-references
-        assert prefs.window.current.opacity == opacity
-
-    @pytest.mark.parametrize("opacity", [0.1, 0.5, 1.0])
-    def test_changes_window_opacity_on_construction(
-        self, qtbot: QtBot, opacity: float
-    ) -> None:
-        prefs = _make_prefs()
-        state = WindowState(123, 456, True, opacity)
-        prefs.window = Window(state)
-
-        sut = PetWindow(prefs)
-        qtbot.addWidget(sut)
-
-        assert sut.windowOpacity() == pytest.approx(opacity, abs=1 / 255)
 
 
 class TestPlayIdempotent:

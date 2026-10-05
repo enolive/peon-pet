@@ -62,9 +62,7 @@ class Window:
         p = _config_path()
         p.parent.mkdir(parents=True, exist_ok=True)
         data = _read()
-        data.window = _WindowModel(
-            x=state.x, y=state.y, visible=state.visible, opacity=state.opacity
-        )
+        data.window = _WindowModel(x=state.x, y=state.y, visible=state.visible)
         self._atomic_write(p, data.model_dump_json(indent=2))
 
     @staticmethod
@@ -83,7 +81,6 @@ class WindowState:
     x: int
     y: int
     visible: bool
-    opacity: float
 
 
 @final
@@ -110,7 +107,6 @@ class Prefs:
             x=data.window.x,
             y=data.window.y,
             visible=data.window.visible,
-            opacity=data.window.opacity,
         )
 
 
@@ -128,4 +124,3 @@ class _WindowModel(BaseModel):
     x: int = Field(strict=True)
     y: int = Field(strict=True)
     visible: bool = Field(strict=True)
-    opacity: float = Field(gt=0, le=1, default=1.0, strict=True)

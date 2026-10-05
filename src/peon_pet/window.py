@@ -115,18 +115,12 @@ class PetWindow(QtWidgets.QWidget):
                 self._move_default()
         else:
             self._move_default()
-        if saved is not None:
-            self.setWindowOpacity(saved.opacity)
 
     def restore_visibility(self):
         state = self._prefs.window.current
         should_show: bool = state is None or state.visible
         if should_show:
             self.show()
-
-    def set_opacity(self, opacity: float) -> None:
-        self.setWindowOpacity(opacity)
-        self._save_current_state()
 
     @property
     def anim(self) -> Anim | None:
@@ -332,10 +326,7 @@ class PetWindow(QtWidgets.QWidget):
         )
 
     def _save_current_state(self):
-        raw_opacity = self.windowOpacity()
-        new_state = WindowState(
-            self.pos().x(), self.pos().y(), self.isVisible(), round(raw_opacity, 1)
-        )
+        new_state = WindowState(self.pos().x(), self.pos().y(), self.isVisible())
         self._prefs.window.save(new_state)
 
 

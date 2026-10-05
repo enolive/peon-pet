@@ -69,6 +69,12 @@ peon-pet --uninstall
 peon-pet --help
 ```
 
+# Wayland limitations
+
+As Wayland prohibits apps from moving around on their own, Peon Pet will only work fully on this platform
+when `QT_QPA_PLATFORM` is set to `xcb`. Without it, its position will be fixed to the top left corner and the window
+will not be movable.
+
 ## Configuration
 
 Peon pet creates a `config.json` inside your config directory, usually `~/.config/peon-pet`.
@@ -77,7 +83,8 @@ Peon pet creates a `config.json` inside your config directory, usually `~/.confi
 {
   "window": {
     "x": 2282,
-    "y": 1144
+    "y": 1144,
+    "visible": true
   },
   "atlas": "2b",
   "loops": 3

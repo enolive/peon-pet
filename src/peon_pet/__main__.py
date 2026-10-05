@@ -87,7 +87,6 @@ def run(
 
     tray = TrayIcon(app)
     _ = tray.on_toggle_visibility.connect(win.toggle_visibility)
-    _ = tray.on_set_opacity.connect(win.set_opacity)
     tray.show()
 
     # Ctrl-C in the terminal should exit cleanly instead of being swallowed by Qt.

@@ -90,14 +90,13 @@ def test_loops_defaults_when_invalid(
     assert sut.loops == DEFAULT_LOOPS
 
 
-@pytest.mark.parametrize("opacity", [0.1, 0.5, 1.0])
 def test_position_save_round_trip(
-    opacity: float, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
     sut = Prefs()
     assert sut.window.current is None
-    state = WindowState(123, 456, False, opacity)
+    state = WindowState(123, 456, False)
 
     sut.window.save(state)
 
@@ -112,7 +111,7 @@ def test_position_save_preserves_other_settings(
     _write_config(tmp_path, {"atlas": "orc", "loops": 5})
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
     sut = Prefs()
-    state = WindowState(10, 20, False, 0.2)
+    state = WindowState(10, 20, False)
 
     sut.window.save(state)
 
